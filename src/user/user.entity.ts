@@ -38,7 +38,7 @@ export class User {
   // Self-referencing relationship: which admin created this user
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'created_by' })
-  createdBy: User;
+  createdBy: User | null;
 
   // Automatically tracks when the user was created
   @CreateDateColumn({ name: 'created_at' })
