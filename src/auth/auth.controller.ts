@@ -3,6 +3,8 @@ import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -52,5 +54,37 @@ export class AuthController {
   @Get('profile')
   getProfile(@Request() req) {
     return req.user;
+  }
+
+  /**
+   * 4. GET /api/auth/me
+   * Returns id, name, and role of the current user
+   */
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me')
+  getMe(@Request() req) {
+    const { id, name, role } = req.user;
+    return { id, name, role };
+  }
+
+  /**
+   * 5. POST /api/auth/forgot-password
+   * Sends a password reset link (simulated)
+   */
+  @Post('forgot-password')
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto.email);
+  }
+
+  /**
+   * 6. POST /api/auth/reset-password
+   * Resets the user's password
+   */
+  @Post('reset-password')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.newPassword,
+    );
   }
 }

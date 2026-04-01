@@ -37,4 +37,18 @@ export class UserService {
   async remove(id: string): Promise<void> {
     await this.usersRepository.delete(id);
   }
+
+  /**
+   * Find a single user by their password reset token
+   */
+  findOneByResetToken(token: string): Promise<User | null> {
+    return this.usersRepository.findOne({ where: { resetPasswordToken: token } });
+  }
+
+  /**
+   * Save a user entity
+   */
+  async save(user: User): Promise<User> {
+    return this.usersRepository.save(user);
+  }
 }

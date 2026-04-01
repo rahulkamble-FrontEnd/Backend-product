@@ -47,4 +47,11 @@ export class User {
   // Automatically tracks when the user was last updated
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // Fields for password reset
+  @Column({ name: 'reset_password_token', type: 'varchar', nullable: true })
+  resetPasswordToken: string | null;
+
+  @Column({ name: 'reset_password_expires', type: 'datetime', nullable: true })
+  resetPasswordExpires: Date | null;
 }
