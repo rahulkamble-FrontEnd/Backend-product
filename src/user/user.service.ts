@@ -1,8 +1,9 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -45,6 +46,25 @@ export class UserService {
     // Remove sensitive data before returning
     const { passwordHash: _, ...userWithoutPassword } = savedUser;
     return userWithoutPassword as User;
+  }
+
+  /**
+   * Update a user's details (called by Admin)
+   */
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    // Find the user to update
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found`);
+    }
+
+    // Merge the new data into the existing user object
+    Object.assign(user, updateUserDto);
+
+    // Save and return the updated user
+    const savedUser = await this.usersRepository.save(user);
+    const { passwordHash, ...result } = savedUser;
+    return result as User;
   }
 
   /**
