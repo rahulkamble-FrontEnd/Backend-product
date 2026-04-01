@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Put, Param } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Put, Param , Delete} from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -29,5 +29,15 @@ export class UserController {
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
+  }
+
+  /**
+   * Admin deactivates a user (soft delete)
+   */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id')
+  async deactivate(@Param('id') id: string) {
+    return this.userService.deactivate(id);
   }
 }

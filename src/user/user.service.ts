@@ -68,6 +68,19 @@ export class UserService {
   }
 
   /**
+   * Deactivate a user (soft delete)
+   */
+  async deactivate(id: string): Promise<{ message: string }> {
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found`);
+    }
+    user.isActive = false;
+    await this.usersRepository.save(user);
+    return { message: `User with ID '${id}' has been deactivated` };
+  }
+
+  /**
    * Find all users
    */
   findAll(): Promise<User[]> {
