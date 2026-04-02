@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards, Request, Put, Param , Delete} from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Put, Param, Delete, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AssignDesignerDto } from './dto/assign-designer.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -39,5 +40,25 @@ export class UserController {
   @Delete(':id')
   async deactivate(@Param('id') id: string) {
     return this.userService.deactivate(id);
+  }
+
+  /**
+   * Admin lists all users, optionally filtered by role
+   */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get()
+  async listAll(@Query('role') role?: string) {
+    return this.userService.findAll(role);
+  }
+
+  /**
+   * Admin assigns a designer to a customer
+   */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post('assign')
+  async assignDesigner(@Body() assignDesignerDto: AssignDesignerDto) {
+    return this.userService.assignDesigner(assignDesignerDto);
   }
 }

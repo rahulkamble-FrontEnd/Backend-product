@@ -2,9 +2,10 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto, UserRole } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { AssignDesignerDto } from './dto/assign-designer.dto';
 
 @Injectable()
 export class UserService {
@@ -12,6 +13,31 @@ export class UserService {
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}
+
+  /**
+   * Assign a designer to a customer
+   */
+  async assignDesigner(assignDesignerDto: AssignDesignerDto): Promise<{ message: string }> {
+    const { customerId, designerId } = assignDesignerDto;
+
+    // 1. Find the customer
+    const customer = await this.usersRepository.findOne({ where: { id: customerId, role: UserRole.CUSTOMER } });
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID '${customerId}' not found`);
+    }
+
+    // 2. Find the designer
+    const designer = await this.usersRepository.findOne({ where: { id: designerId, role: UserRole.DESIGNER } });
+    if (!designer) {
+      throw new NotFoundException(`Designer with ID '${designerId}' not found`);
+    }
+
+    // 3. Assign and save
+    customer.assignedDesigner = designer;
+    await this.usersRepository.save(customer);
+
+    return { message: `Designer '${designer.name}' successfully assigned to Customer '${customer.name}'` };
+  }
 
   /**
    * Create a new user (called by Admin)
@@ -81,10 +107,19 @@ export class UserService {
   }
 
   /**
-   * Find all users
+   * Find all users, optionally filtered by role
    */
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async findAll(role?: string): Promise<User[]> {
+    const where: any = {};
+    if (role) {
+      where.role = role;
+    }
+    const users = await this.usersRepository.find({ where });
+    // Remove sensitive data from all returned users
+    return users.map((user) => {
+      const { passwordHash, resetPasswordToken, resetPasswordExpires, ...result } = user;
+      return result as User;
+    });
   }
 
   /**
