@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -13,13 +13,13 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Get()
-  async findAll(): Promise<Category[]> {
-    return this.categoryService.findAll();
+  async findAll(@Query('type') type?: string): Promise<Category[]> {
+    return this.categoryService.findAll(type);
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<Category | null> {
-    return this.categoryService.findOne(id);
+  @Get(':slug')
+  async findBySlug(@Param('slug') slug: string): Promise<Category | null> {
+    return this.categoryService.findBySlug(slug);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

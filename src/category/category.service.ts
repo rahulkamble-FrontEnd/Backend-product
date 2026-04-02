@@ -10,12 +10,23 @@ export class CategoryService {
     private categoryRepository: Repository<Category>,
   ) { }
 
-  async findAll(): Promise<Category[]> {
-    return this.categoryRepository.find();
+  async findAll(type?: string): Promise<Category[]> {
+    const where: any = { isActive: true };
+    if (type) {
+      where.type = type;
+    }
+    return this.categoryRepository.find({ where });
   }
 
   async findOne(id: string): Promise<Category | null> {
     return this.categoryRepository.findOneBy({ id });
+  }
+
+  async findBySlug(slug: string): Promise<Category | null> {
+    return this.categoryRepository.findOne({
+      where: { slug, isActive: true },
+      relations: ['children'],
+    });
   }
 
   async create(createCategoryDto: any): Promise<Category> {
