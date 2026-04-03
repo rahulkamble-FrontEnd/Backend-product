@@ -5,39 +5,12 @@ import { User } from './user.entity';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AssignDesignerDto } from './dto/assign-designer.dto';
-
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}
-
-  /**
-   * Assign a designer to a customer
-   */
-  async assignDesigner(assignDesignerDto: AssignDesignerDto): Promise<{ message: string }> {
-    const { customerId, designerId } = assignDesignerDto;
-
-    // 1. Find the customer
-    const customer = await this.usersRepository.findOne({ where: { id: customerId, role: UserRole.CUSTOMER } });
-    if (!customer) {
-      throw new NotFoundException(`Customer with ID '${customerId}' not found`);
-    }
-
-    // 2. Find the designer
-    const designer = await this.usersRepository.findOne({ where: { id: designerId, role: UserRole.DESIGNER } });
-    if (!designer) {
-      throw new NotFoundException(`Designer with ID '${designerId}' not found`);
-    }
-
-    // 3. Assign and save
-    customer.assignedDesigner = designer;
-    await this.usersRepository.save(customer);
-
-    return { message: `Designer '${designer.name}' successfully assigned to Customer '${customer.name}'` };
-  }
 
   /**
    * Create a new user (called by Admin)
@@ -78,16 +51,39 @@ export class UserService {
    * Update a user's details (called by Admin)
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    const { assignedDesignerId, ...rest } = updateUserDto;
+
     // Find the user to update
-    const user = await this.findOne(id);
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: ['assignedDesigner'],
+    });
+
     if (!user) {
       throw new NotFoundException(`User with ID '${id}' not found`);
     }
 
-    // Merge the new data into the existing user object
-    Object.assign(user, updateUserDto);
+    // 1. Handle designer assignment if ID was provided
+    if (assignedDesignerId !== undefined) {
+      if (assignedDesignerId === null) {
+        // Remove assignment
+        user.assignedDesigner = null;
+      } else {
+        // Find and check if target is a designer
+        const designer = await this.usersRepository.findOne({
+          where: { id: assignedDesignerId, role: UserRole.DESIGNER },
+        });
+        if (!designer) {
+          throw new NotFoundException(`Designer with ID '${assignedDesignerId}' not found`);
+        }
+        user.assignedDesigner = designer;
+      }
+    }
 
-    // Save and return the updated user
+    // 2. Merge the other fields (email, name, role, etc.)
+    Object.assign(user, rest);
+
+    // 3. Save and return clean user object
     const savedUser = await this.usersRepository.save(user);
     const { passwordHash, ...result } = savedUser;
     return result as User;
