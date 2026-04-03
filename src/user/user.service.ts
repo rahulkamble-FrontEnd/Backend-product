@@ -110,7 +110,10 @@ export class UserService {
     if (role) {
       where.role = role;
     }
-    const users = await this.usersRepository.find({ where });
+    const users = await this.usersRepository.find({
+      where,
+      relations: ['assignedDesigner'],
+    });
     // Remove sensitive data from all returned users
     return users.map((user) => {
       const { passwordHash, resetPasswordToken, resetPasswordExpires, ...result } = user;
@@ -122,7 +125,10 @@ export class UserService {
    * Find a single user by their ID
    */
   findOne(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.usersRepository.findOne({
+      where: { id },
+      relations: ['assignedDesigner'],
+    });
   }
 
   /**
