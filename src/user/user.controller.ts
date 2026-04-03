@@ -2,7 +2,6 @@ import { Controller, Get, Post, Body, UseGuards, Request, Put, Param, Delete, Qu
 import { UserService } from './user.service';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AssignDesignerDto } from './dto/assign-designer.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -50,15 +49,5 @@ export class UserController {
   @Get()
   async listAll(@Query('role') role?: string) {
     return this.userService.findAll(role);
-  }
-
-  /**
-   * Admin assigns a designer to a customer
-   */
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @Post('assign')
-  async assignDesigner(@Body() assignDesignerDto: AssignDesignerDto) {
-    return this.userService.assignDesigner(assignDesignerDto);
   }
 }
