@@ -1,5 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../user/user.entity';
+import { ProductCategory } from './product-category.entity';
+import { ProductImage } from './product-image.entity';
 
 @Entity('products')
 export class Product {
@@ -76,4 +78,10 @@ export class Product {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
   updatedAt: Date;
+
+  @OneToMany(() => ProductCategory, (productCategory) => productCategory.product)
+  productCategories: ProductCategory[];
+
+  @OneToMany(() => ProductImage, (productImage) => productImage.product)
+  images: ProductImage[];
 }

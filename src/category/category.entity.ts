@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { ProductCategory } from '../product/product-category.entity';
 
 @Entity('categories')
 export class Category {
@@ -33,4 +34,7 @@ export class Category {
 
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
+
+  @OneToMany(() => ProductCategory, (productCategory) => productCategory.category)
+  productCategories: ProductCategory[];
 }
