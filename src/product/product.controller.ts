@@ -43,6 +43,11 @@ export class ProductController {
     return this.productService.listProducts(query);
   }
 
+  @Get('compare')
+  async compare(@Query('ids') ids: string): Promise<unknown> {
+    return this.productService.compareProducts(ids);
+  }
+
   @Get(':slug')
   async getBySlug(@Param('slug') slug: string): Promise<unknown> {
     return this.productService.getProductBySlug(slug);

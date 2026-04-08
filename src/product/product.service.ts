@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -245,6 +245,95 @@ export class ProductService {
         isActive: pc.category?.isActive,
       })),
     };
+  }
+
+  async compareProducts(idsParam: string): Promise<unknown> {
+    if (!idsParam) {
+      throw new BadRequestException('Query param "ids" is required (comma-separated UUIDs)');
+    }
+
+    const ids = Array.from(
+      new Set(
+        idsParam
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (ids.length === 0) {
+      throw new BadRequestException('At least 1 id is required in "ids"');
+    }
+    if (ids.length > 4) {
+      throw new BadRequestException('Maximum 4 ids are allowed in "ids"');
+    }
+
+    const uuidV4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const invalid = ids.filter((id) => !uuidV4.test(id));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Invalid UUID(s) in "ids": ${invalid.join(', ')}`);
+    }
+
+    const products = await this.productRepository.find({
+      where: { id: In(ids) },
+      relations: {
+        images: true,
+        productCategories: { category: true },
+      },
+    });
+
+    const foundIds = new Set(products.map((p) => p.id));
+    const missingIds = ids.filter((id) => !foundIds.has(id));
+
+    const normalized = products.map((p) => {
+      const images = [...(p.images ?? [])].sort((a, b) => {
+        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      });
+      const primaryImage = images[0];
+
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        brand: p.brand,
+        materialType: p.materialType,
+        finishType: p.finishType,
+        colorName: p.colorName,
+        thickness: p.thickness,
+        dimensions: p.dimensions,
+        performanceRating: p.performanceRating,
+        durabilityRating: p.durabilityRating,
+        priceCategory: p.priceCategory,
+        maintenanceRating: p.maintenanceRating,
+        primaryImageUrl: primaryImage ? this.s3Service.getPublicUrl(primaryImage.s3Key) : null,
+        categories: (p.productCategories ?? []).map((pc) => ({
+          categoryId: pc.categoryId,
+          name: pc.category?.name,
+          slug: pc.category?.slug,
+          type: pc.category?.type,
+        })),
+      };
+    });
+
+    const fields = [
+      { key: 'name', values: normalized.map((p) => p.name) },
+      { key: 'brand', values: normalized.map((p) => p.brand) },
+      { key: 'materialType', values: normalized.map((p) => p.materialType) },
+      { key: 'finishType', values: normalized.map((p) => p.finishType) },
+      { key: 'colorName', values: normalized.map((p) => p.colorName) },
+      { key: 'thickness', values: normalized.map((p) => p.thickness) },
+      { key: 'dimensions', values: normalized.map((p) => p.dimensions) },
+      { key: 'performanceRating', values: normalized.map((p) => p.performanceRating) },
+      { key: 'durabilityRating', values: normalized.map((p) => p.durabilityRating) },
+      { key: 'priceCategory', values: normalized.map((p) => p.priceCategory) },
+      { key: 'maintenanceRating', values: normalized.map((p) => p.maintenanceRating) },
+    ];
+
+    return { ids, missingIds, products: normalized, fields };
   }
 
   async uploadImage(
