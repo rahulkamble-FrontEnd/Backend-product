@@ -34,15 +34,18 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
-  async list(
-    @Query() query: ListProductsQueryDto,
-  ): Promise<{
+  async list(@Query() query: ListProductsQueryDto): Promise<{
     items: unknown[];
     total: number;
     page: number;
     limit: number;
   }> {
     return this.productService.listProducts(query);
+  }
+
+  @Get(':slug')
+  async getBySlug(@Param('slug') slug: string): Promise<unknown> {
+    return this.productService.getProductBySlug(slug);
   }
 
   // ─────────────────────────────────────────────

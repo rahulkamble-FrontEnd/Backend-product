@@ -119,15 +119,14 @@ export class ProductService {
       updatedAt: 'product.updatedAt',
       name: 'product.name',
     };
-    const sortBy = sortByMap[query.sortBy ?? 'createdAt'] ?? sortByMap.createdAt;
-    const sortOrder = (query.sortOrder ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const sortBy =
+      sortByMap[query.sortBy ?? 'createdAt'] ?? sortByMap.createdAt;
+    const sortOrder =
+      (query.sortOrder ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const skip = (page - 1) * limit;
 
-    qb.distinct(true)
-      .orderBy(sortBy, sortOrder)
-      .skip(skip)
-      .take(limit);
+    qb.distinct(true).orderBy(sortBy, sortOrder).skip(skip).take(limit);
 
     const [products, total] = await qb.getManyAndCount();
 
@@ -184,6 +183,68 @@ export class ProductService {
     });
 
     return { items, total, page, limit };
+  }
+
+  async getProductBySlug(slug: string): Promise<unknown> {
+    const product = await this.productRepository.findOne({
+      where: { slug },
+      relations: {
+        images: true,
+        productCategories: { category: true },
+      },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with slug "${slug}" not found`);
+    }
+
+    const images = [...(product.images ?? [])].sort((a, b) => {
+      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+      if (a.displayOrder !== b.displayOrder)
+        return a.displayOrder - b.displayOrder;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      sku: product.sku,
+      brand: product.brand,
+      description: product.description,
+      materialType: product.materialType,
+      finishType: product.finishType,
+      colorName: product.colorName,
+      colorHex: product.colorHex,
+      thickness: product.thickness,
+      dimensions: product.dimensions,
+      performanceRating: product.performanceRating,
+      durabilityRating: product.durabilityRating,
+      priceCategory: product.priceCategory,
+      maintenanceRating: product.maintenanceRating,
+      bestUsedFor: product.bestUsedFor,
+      pros: product.pros,
+      cons: product.cons,
+      status: product.status,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      images: images.map((img) => ({
+        id: img.id,
+        s3Key: img.s3Key,
+        url: this.s3Service.getPublicUrl(img.s3Key),
+        displayOrder: img.displayOrder,
+        isPrimary: img.isPrimary,
+        createdAt: img.createdAt,
+      })),
+      categories: (product.productCategories ?? []).map((pc) => ({
+        id: pc.id,
+        categoryId: pc.categoryId,
+        name: pc.category?.name,
+        slug: pc.category?.slug,
+        type: pc.category?.type,
+        displayOrder: pc.category?.displayOrder,
+        isActive: pc.category?.isActive,
+      })),
+    };
   }
 
   async uploadImage(
