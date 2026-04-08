@@ -1,10 +1,12 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   UseGuards,
   Req,
   Param,
+  Query,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -18,6 +20,7 @@ import { UploadProductImageDto } from './dto/upload-product-image.dto';
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
 import { LinkProductCategoriesDto } from './dto/link-product-categories.dto';
+import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -29,6 +32,18 @@ const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
+
+  @Get()
+  async list(
+    @Query() query: ListProductsQueryDto,
+  ): Promise<{
+    items: unknown[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.productService.listProducts(query);
+  }
 
   // ─────────────────────────────────────────────
   // POST /products

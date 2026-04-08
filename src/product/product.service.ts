@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Brackets } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import { Product } from './product.entity';
@@ -8,6 +8,7 @@ import { ProductCategory } from './product-category.entity';
 import { ProductImage } from './product-image.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UploadProductImageDto } from './dto/upload-product-image.dto';
+import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
 
@@ -61,6 +62,128 @@ export class ProductService {
     }
 
     return savedProduct;
+  }
+
+  async listProducts(
+    query: ListProductsQueryDto,
+  ): Promise<{ items: unknown[]; total: number; page: number; limit: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const includeImages = query.includeImages === 'true';
+    const includeCategories = query.includeCategories === 'true';
+
+    const qb = this.productRepository.createQueryBuilder('product');
+
+    if (includeImages) {
+      qb.leftJoinAndSelect('product.images', 'image');
+    }
+
+    if (includeCategories) {
+      qb.leftJoinAndSelect('product.productCategories', 'productCategory');
+      qb.leftJoinAndSelect('productCategory.category', 'category');
+    } else if (query.categoryId || query.categoryType) {
+      qb.leftJoin('product.productCategories', 'productCategory');
+      qb.leftJoin('productCategory.category', 'category');
+    }
+
+    if (query.status) {
+      qb.andWhere('product.status = :status', { status: query.status });
+    }
+
+    if (query.q) {
+      const q = `%${query.q}%`;
+      qb.andWhere(
+        new Brackets((whereQb) => {
+          whereQb
+            .where('product.name LIKE :q', { q })
+            .orWhere('product.sku LIKE :q', { q })
+            .orWhere('product.brand LIKE :q', { q });
+        }),
+      );
+    }
+
+    if (query.categoryId) {
+      qb.andWhere('productCategory.categoryId = :categoryId', {
+        categoryId: query.categoryId,
+      });
+    }
+
+    if (query.categoryType) {
+      qb.andWhere('category.type = :categoryType', {
+        categoryType: query.categoryType,
+      });
+    }
+
+    const sortByMap: Record<string, string> = {
+      createdAt: 'product.createdAt',
+      updatedAt: 'product.updatedAt',
+      name: 'product.name',
+    };
+    const sortBy = sortByMap[query.sortBy ?? 'createdAt'] ?? sortByMap.createdAt;
+    const sortOrder = (query.sortOrder ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const skip = (page - 1) * limit;
+
+    qb.distinct(true)
+      .orderBy(sortBy, sortOrder)
+      .skip(skip)
+      .take(limit);
+
+    const [products, total] = await qb.getManyAndCount();
+
+    const items: unknown[] = products.map((p) => {
+      const item: Record<string, unknown> = {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        brand: p.brand,
+        description: p.description,
+        materialType: p.materialType,
+        finishType: p.finishType,
+        colorName: p.colorName,
+        colorHex: p.colorHex,
+        thickness: p.thickness,
+        dimensions: p.dimensions,
+        performanceRating: p.performanceRating,
+        durabilityRating: p.durabilityRating,
+        priceCategory: p.priceCategory,
+        maintenanceRating: p.maintenanceRating,
+        bestUsedFor: p.bestUsedFor,
+        pros: p.pros,
+        cons: p.cons,
+        status: p.status,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      };
+
+      if (includeImages) {
+        item.images = (p.images ?? []).map((img) => ({
+          id: img.id,
+          s3Key: img.s3Key,
+          url: this.s3Service.getPublicUrl(img.s3Key),
+          displayOrder: img.displayOrder,
+          isPrimary: img.isPrimary,
+          createdAt: img.createdAt,
+        }));
+      }
+
+      if (includeCategories) {
+        item.categories = (p.productCategories ?? []).map((pc) => ({
+          id: pc.id,
+          categoryId: pc.categoryId,
+          name: pc.category?.name,
+          slug: pc.category?.slug,
+          type: pc.category?.type,
+          displayOrder: pc.category?.displayOrder,
+          isActive: pc.category?.isActive,
+        }));
+      }
+
+      return item;
+    });
+
+    return { items, total, page, limit };
   }
 
   async uploadImage(
@@ -135,8 +258,8 @@ export class ProductService {
     const toCreateIds = validIds.filter((id) => !existingIds.has(id));
     const entities = toCreateIds.map((id) =>
       this.productCategoryRepository.create({
-        product: { id: productId } as any,
-        category: { id } as any,
+        productId,
+        categoryId: id,
       }),
     );
     if (entities.length > 0) {
