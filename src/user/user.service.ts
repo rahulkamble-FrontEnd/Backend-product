@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -41,7 +45,7 @@ export class UserService {
 
     // 5. Save and return
     const savedUser = await this.usersRepository.save(newUser);
-    
+
     // Remove sensitive data before returning
     const { passwordHash: _, ...userWithoutPassword } = savedUser;
     return userWithoutPassword as User;
@@ -74,7 +78,9 @@ export class UserService {
           where: { id: assignedDesignerId, role: UserRole.DESIGNER },
         });
         if (!designer) {
-          throw new NotFoundException(`Designer with ID '${assignedDesignerId}' not found`);
+          throw new NotFoundException(
+            `Designer with ID '${assignedDesignerId}' not found`,
+          );
         }
         user.assignedDesigner = designer;
       }
@@ -113,7 +119,12 @@ export class UserService {
     const users = await this.usersRepository.find({ where });
     // Remove sensitive data from all returned users
     return users.map((user) => {
-      const { passwordHash, resetPasswordToken, resetPasswordExpires, ...result } = user;
+      const {
+        passwordHash,
+        resetPasswordToken,
+        resetPasswordExpires,
+        ...result
+      } = user;
       return result as User;
     });
   }
@@ -143,7 +154,9 @@ export class UserService {
    * Find a single user by their password reset token
    */
   findOneByResetToken(token: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { resetPasswordToken: token } });
+    return this.usersRepository.findOne({
+      where: { resetPasswordToken: token },
+    });
   }
 
   /**

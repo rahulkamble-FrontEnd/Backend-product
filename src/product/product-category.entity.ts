@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index, Column } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  JoinColumn,
+  Index,
+  Column,
+} from 'typeorm';
 import { Product } from './product.entity';
 import { Category } from '../category/category.entity';
 
@@ -15,11 +22,15 @@ export class ProductCategory {
   @Index()
   categoryId: string;
 
-  @ManyToOne(() => Product, (product) => product.productCategories, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Product, (product) => product.productCategories, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @ManyToOne(() => Category, (category) => category.productCategories, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Category, (category) => category.productCategories, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'category_id' })
   category: Category;
 }

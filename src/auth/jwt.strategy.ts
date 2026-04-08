@@ -21,11 +21,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    */
   async validate(payload: any) {
     // Return user info from the payload (decoded token)
-    return { 
-      id: payload.sub, 
+    return {
+      id: payload.sub,
       email: payload.email,
       name: payload.name,
-      role: payload.role
+      role: payload.role,
     };
   }
 }

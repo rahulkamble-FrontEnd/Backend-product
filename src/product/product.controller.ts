@@ -17,6 +17,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UploadProductImageDto } from './dto/upload-product-image.dto';
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
+import { LinkProductCategoriesDto } from './dto/link-product-categories.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -78,5 +79,15 @@ export class ProductController {
       );
     }
     return this.productService.uploadImage(productId, file, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post(':id/categories')
+  async linkCategories(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: LinkProductCategoriesDto,
+  ): Promise<{ added: number; skipped: string[]; invalid: string[] }> {
+    return this.productService.linkCategories(productId, dto.categoryIds);
   }
 }
