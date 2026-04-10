@@ -5,10 +5,19 @@ import { ProductCategory } from './product-category.entity';
 import { ProductImage } from './product-image.entity';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
+import { S3Service } from '../common/services/s3.service';
+import { Category } from '../category/category.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ProductCategory, ProductImage])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Product,
+      ProductCategory,
+      ProductImage,
+      Category,
+    ]),
+  ],
   controllers: [ProductController],
-  providers: [ProductService],
+  providers: [ProductService, S3Service],
 })
 export class ProductModule {}
