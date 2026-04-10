@@ -6,6 +6,11 @@ import { UserModule } from './user/user.module';
 import { CategoryModule } from './category/category.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductModule } from './product/product.module';
+import { ShortlistModule } from './shortlist/shortlist.module';
+import { NotificationModule } from './notification/notification.module';
+import { BlogModule } from './blog/blog.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
+import { TrendingModule } from './trending/trending.module';
 
 @Module({
   imports: [
@@ -44,6 +49,11 @@ import { ProductModule } from './product/product.module';
     UserModule,
     CategoryModule,
     ProductModule,
+    ShortlistModule,
+    NotificationModule,
+    BlogModule,
+    PortfolioModule,
+    TrendingModule,
   ],
   controllers: [AppController],
   providers: [],
