@@ -8,6 +8,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductModule } from './product/product.module';
 import { ShortlistModule } from './shortlist/shortlist.module';
 import { NotificationModule } from './notification/notification.module';
+import { BlogModule } from './blog/blog.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { NotificationModule } from './notification/notification.module';
     ProductModule,
     ShortlistModule,
     NotificationModule,
+    BlogModule,
+    PortfolioModule,
   ],
   controllers: [AppController],
   providers: [],
