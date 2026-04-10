@@ -1,4 +1,13 @@
-import { Controller, Post, Body, UnauthorizedException, Get, UseGuards, Request, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  Get,
+  UseGuards,
+  Request,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -15,22 +24,28 @@ export class AuthController {
    * Validates user and sets an httpOnly JWT cookie
    */
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     // Validate credentials
-    const user = await this.authService.validateUser(loginDto.email, loginDto.password);
-    
+    const user = await this.authService.validateUser(
+      loginDto.email,
+      loginDto.password,
+    );
+
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
     // Create the token
     const { access_token } = await this.authService.login(user);
-    
+
     // Set the token as a secure cookie
-    response.cookie('jwt', access_token, { 
+    response.cookie('jwt', access_token, {
       httpOnly: true, // Secure: cookie cannot be accessed via JS
       secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      maxAge: 3600000 // 1 hour
+      maxAge: 3600000, // 1 hour
     });
 
     return { message: 'Login successful' };

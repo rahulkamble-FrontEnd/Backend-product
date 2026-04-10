@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from 'typeorm';
 import { ProductCategory } from '../product/product-category.entity';
 
 @Entity('categories')
@@ -12,7 +20,10 @@ export class Category {
   @Column({ type: 'varchar', length: 160, unique: true, nullable: false })
   slug: string;
 
-  @ManyToOne(() => Category, (category) => category.children, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Category, (category) => category.children, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'parent_id' })
   parent: Category | null;
 
@@ -35,6 +46,9 @@ export class Category {
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
-  @OneToMany(() => ProductCategory, (productCategory) => productCategory.category)
+  @OneToMany(
+    () => ProductCategory,
+    (productCategory) => productCategory.category,
+  )
   productCategories: ProductCategory[];
 }

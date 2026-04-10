@@ -1,4 +1,14 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { User } from '../user/user.entity';
 import { ProductCategory } from './product-category.entity';
 import { ProductImage } from './product-image.entity';
@@ -23,7 +33,12 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ name: 'material_type', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'material_type',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   materialType: string;
 
   @Column({ name: 'finish_type', type: 'varchar', length: 100, nullable: true })
@@ -79,7 +94,13 @@ export class Product {
   @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
   updatedAt: Date;
 
-  @OneToMany(() => ProductCategory, (productCategory) => productCategory.product)
+  @DeleteDateColumn({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt: Date | null;
+
+  @OneToMany(
+    () => ProductCategory,
+    (productCategory) => productCategory.product,
+  )
   productCategories: ProductCategory[];
 
   @OneToMany(() => ProductImage, (productImage) => productImage.product)

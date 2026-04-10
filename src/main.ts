@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   /**
    * 1. GLOBAL PREFIX
    * All routes will start with /api (e.g., http://localhost:3000/api/auth/login)
@@ -18,11 +18,13 @@ async function bootstrap() {
    * - whitelist: true (Removes any fields that are not defined in the DTO)
    * - forbidNonWhitelisted: true (Throws an error if extra fields are sent)
    */
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   /**
    * 3. CORS
