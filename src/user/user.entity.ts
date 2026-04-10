@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 
 /**
  * This class represents the 'users' table in our database.
@@ -35,10 +43,14 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  // Self-referencing relationship: which admin created this user
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'created_by' })
   createdBy: User | null;
+
+  // Relationship: which designer is assigned to this customer
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assigned_designer_id' })
+  assignedDesigner: User | null;
 
   // Automatically tracks when the user was created
   @CreateDateColumn({ name: 'created_at' })

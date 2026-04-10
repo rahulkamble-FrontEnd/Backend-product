@@ -1,4 +1,15 @@
-import { Controller, Post, Body, UseGuards, Request, Put, Param , Delete} from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Put,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -39,5 +50,15 @@ export class UserController {
   @Delete(':id')
   async deactivate(@Param('id') id: string) {
     return this.userService.deactivate(id);
+  }
+
+  /**
+   * Admin lists all users, optionally filtered by role
+   */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get()
+  async listAll(@Query('role') role?: string) {
+    return this.userService.findAll(role);
   }
 }

@@ -1,11 +1,14 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
-
+import { CreateUserDto, UserRole } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 @Injectable()
 export class UserService {
   constructor(
@@ -42,7 +45,7 @@ export class UserService {
 
     // 5. Save and return
     const savedUser = await this.usersRepository.save(newUser);
-    
+
     // Remove sensitive data before returning
     const { passwordHash: _, ...userWithoutPassword } = savedUser;
     return userWithoutPassword as User;
@@ -52,16 +55,41 @@ export class UserService {
    * Update a user's details (called by Admin)
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    const { assignedDesignerId, ...rest } = updateUserDto;
+
     // Find the user to update
-    const user = await this.findOne(id);
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: ['assignedDesigner'],
+    });
+
     if (!user) {
       throw new NotFoundException(`User with ID '${id}' not found`);
     }
 
-    // Merge the new data into the existing user object
-    Object.assign(user, updateUserDto);
+    // 1. Handle designer assignment if ID was provided
+    if (assignedDesignerId !== undefined) {
+      if (assignedDesignerId === null) {
+        // Remove assignment
+        user.assignedDesigner = null;
+      } else {
+        // Find and check if target is a designer
+        const designer = await this.usersRepository.findOne({
+          where: { id: assignedDesignerId, role: UserRole.DESIGNER },
+        });
+        if (!designer) {
+          throw new NotFoundException(
+            `Designer with ID '${assignedDesignerId}' not found`,
+          );
+        }
+        user.assignedDesigner = designer;
+      }
+    }
 
-    // Save and return the updated user
+    // 2. Merge the other fields (email, name, role, etc.)
+    Object.assign(user, rest);
+
+    // 3. Save and return clean user object
     const savedUser = await this.usersRepository.save(user);
     const { passwordHash, ...result } = savedUser;
     return result as User;
@@ -81,17 +109,37 @@ export class UserService {
   }
 
   /**
-   * Find all users
+   * Find all users, optionally filtered by role
    */
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async findAll(role?: string): Promise<User[]> {
+    const where: any = {};
+    if (role) {
+      where.role = role;
+    }
+    const users = await this.usersRepository.find({
+      where,
+      relations: ['assignedDesigner'],
+    });
+    // Remove sensitive data from all returned users
+    return users.map((user) => {
+      const {
+        passwordHash,
+        resetPasswordToken,
+        resetPasswordExpires,
+        ...result
+      } = user;
+      return result as User;
+    });
   }
 
   /**
    * Find a single user by their ID
    */
   findOne(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.usersRepository.findOne({
+      where: { id },
+      relations: ['assignedDesigner'],
+    });
   }
 
   /**
@@ -112,7 +160,9 @@ export class UserService {
    * Find a single user by their password reset token
    */
   findOneByResetToken(token: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { resetPasswordToken: token } });
+    return this.usersRepository.findOne({
+      where: { resetPasswordToken: token },
+    });
   }
 
   /**
