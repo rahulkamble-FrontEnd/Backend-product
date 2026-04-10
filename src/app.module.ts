@@ -7,6 +7,7 @@ import { CategoryModule } from './category/category.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductModule } from './product/product.module';
 import { ShortlistModule } from './shortlist/shortlist.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ShortlistModule } from './shortlist/shortlist.module';
     CategoryModule,
     ProductModule,
     ShortlistModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [],
