@@ -4,6 +4,8 @@ import {
   S3Client,
   PutObjectCommand,
   PutObjectCommandInput,
+  DeleteObjectCommand,
+  DeleteObjectCommandInput,
 } from '@aws-sdk/client-s3';
 
 @Injectable()
@@ -62,5 +64,22 @@ export class S3Service {
    */
   getPublicUrl(key: string): string {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+  }
+
+  async deleteFile(key: string): Promise<void> {
+    const params: DeleteObjectCommandInput = {
+      Bucket: this.bucket,
+      Key: key,
+    };
+
+    try {
+      await this.s3Client.send(new DeleteObjectCommand(params));
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown S3 error';
+      throw new InternalServerErrorException(
+        `Failed to delete file from S3: ${message}`,
+      );
+    }
   }
 }

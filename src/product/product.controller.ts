@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Delete,
   UseGuards,
   Req,
   Param,
@@ -112,5 +113,34 @@ export class ProductController {
     @Body() dto: LinkProductCategoriesDto,
   ): Promise<{ added: number; skipped: string[]; invalid: string[] }> {
     return this.productService.linkCategories(productId, dto.categoryIds);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id/categories/:catId')
+  async unlinkCategory(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('catId', ParseUUIDPipe) categoryId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.unlinkCategory(productId, categoryId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id/images/:imgId')
+  async removeImage(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('imgId', ParseUUIDPipe) imageId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.removeProductImage(productId, imageId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id')
+  async remove(
+    @Param('id', ParseUUIDPipe) productId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.softDeleteProduct(productId);
   }
 }

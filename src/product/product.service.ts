@@ -340,6 +340,57 @@ export class ProductService {
     return { ids, missingIds, products: normalized, fields };
   }
 
+  async softDeleteProduct(productId: string): Promise<{ message: string }> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+      withDeleted: true,
+      select: ['id', 'deletedAt'],
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    if (product.deletedAt) {
+      return { message: `Product with id "${productId}" is already deleted` };
+    }
+
+    await this.productRepository.softDelete(productId);
+    return { message: `Product with id "${productId}" has been deleted` };
+  }
+
+  async removeProductImage(
+    productId: string,
+    imageId: string,
+  ): Promise<{ message: string }> {
+    const image = await this.productImageRepository.findOne({
+      where: { id: imageId, productId },
+      select: ['id', 'productId', 's3Key', 'isPrimary'],
+    });
+    if (!image) {
+      throw new NotFoundException(
+        `Image with id "${imageId}" not found for product "${productId}"`,
+      );
+    }
+
+    await this.s3Service.deleteFile(image.s3Key);
+    await this.productImageRepository.delete({ id: imageId });
+
+    if (image.isPrimary) {
+      const next = await this.productImageRepository.findOne({
+        where: { productId },
+        order: { isPrimary: 'DESC', displayOrder: 'ASC', createdAt: 'ASC' },
+      });
+      if (next) {
+        await this.productImageRepository.update(
+          { id: next.id },
+          { isPrimary: true },
+        );
+      }
+    }
+
+    return { message: `Image "${imageId}" removed for product "${productId}"` };
+  }
+
   async uploadImage(
     productId: string,
     file: Express.Multer.File,
@@ -421,5 +472,40 @@ export class ProductService {
     }
     const skipped = validIds.filter((id) => existingIds.has(id));
     return { added: entities.length, skipped, invalid };
+  }
+
+  async unlinkCategory(
+    productId: string,
+    categoryId: string,
+  ): Promise<{ message: string }> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const category = await this.categoryRepository.findOne({
+      where: { id: categoryId },
+      select: ['id'],
+    });
+    if (!category) {
+      throw new NotFoundException(`Category with id "${categoryId}" not found`);
+    }
+
+    const result = await this.productCategoryRepository.delete({
+      productId,
+      categoryId,
+    });
+
+    if ((result.affected ?? 0) === 0) {
+      throw new NotFoundException(
+        `Category "${categoryId}" is not linked to product "${productId}"`,
+      );
+    }
+
+    return {
+      message: `Category "${categoryId}" unlinked from product "${productId}"`,
+    };
   }
 }
