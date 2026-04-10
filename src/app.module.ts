@@ -10,6 +10,7 @@ import { ShortlistModule } from './shortlist/shortlist.module';
 import { NotificationModule } from './notification/notification.module';
 import { BlogModule } from './blog/blog.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
+import { TrendingModule } from './trending/trending.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
     NotificationModule,
     BlogModule,
     PortfolioModule,
+    TrendingModule,
   ],
   controllers: [AppController],
   providers: [],
