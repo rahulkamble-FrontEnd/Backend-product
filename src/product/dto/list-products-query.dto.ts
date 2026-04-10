@@ -28,7 +28,7 @@ export class ListProductsQueryDto {
   q?: string;
 
   @IsOptional()
-  @IsIn(['draft', 'active', 'archived'])
+  @IsIn(['draft', 'active', 'archived', 'published'])
   status?: string;
 
   @IsOptional()

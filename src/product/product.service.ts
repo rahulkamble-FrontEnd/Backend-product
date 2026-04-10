@@ -31,6 +31,9 @@ export class ProductService {
     user: any,
   ): Promise<Product> {
     const { categoryIds, ...productData } = createProductDto;
+    if (productData.status === 'published') {
+      productData.status = 'active';
+    }
 
     // Create unique slug from name
     const slug =
@@ -87,7 +90,8 @@ export class ProductService {
     }
 
     if (query.status) {
-      qb.andWhere('product.status = :status', { status: query.status });
+      const status = query.status === 'published' ? 'active' : query.status;
+      qb.andWhere('product.status = :status', { status });
     }
 
     if (query.q) {

@@ -3,7 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsArray,
-  IsEnum,
+  IsIn,
   IsNumber,
 } from 'class-validator';
 
@@ -79,7 +79,7 @@ export class CreateProductDto {
   @IsOptional()
   cons?: string[];
 
-  @IsEnum(['draft', 'active', 'archived'])
+  @IsIn(['draft', 'active', 'archived', 'published'])
   @IsOptional()
   status?: string;
 
