@@ -8,7 +8,7 @@ export class CategoryService {
   constructor(
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
-  ) { }
+  ) {}
 
   async findAll(type?: string): Promise<Category[]> {
     const where: any = { isActive: true };
@@ -33,7 +33,8 @@ export class CategoryService {
     const { name, type, parent_id } = createCategoryDto;
 
     // Create unique slug from name
-    const slug = name.toLowerCase()
+    const slug = name
+      .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
@@ -55,7 +56,8 @@ export class CategoryService {
 
     if (name) {
       updateData.name = name;
-      updateData.slug = name.toLowerCase()
+      updateData.slug = name
+        .toLowerCase()
         .trim()
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_-]+/g, '-')
@@ -63,7 +65,8 @@ export class CategoryService {
     }
 
     if (type) updateData.type = type;
-    if (parent_id !== undefined) updateData.parent = parent_id ? { id: parent_id } : null;
+    if (parent_id !== undefined)
+      updateData.parent = parent_id ? { id: parent_id } : null;
 
     await this.categoryRepository.update(id, updateData);
     return this.findOne(id);
