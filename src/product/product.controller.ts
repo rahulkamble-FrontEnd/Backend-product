@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Delete,
+  Put,
   UseGuards,
   Req,
   Param,
@@ -17,11 +18,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { UploadProductImageDto } from './dto/upload-product-image.dto';
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
 import { LinkProductCategoriesDto } from './dto/link-product-categories.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -66,6 +69,16 @@ export class ProductController {
     @Req() req: any,
   ): Promise<Product> {
     return this.productService.create(createProductDto, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Put(':id')
+  async update(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: UpdateProductDto,
+  ): Promise<Product> {
+    return this.productService.update(productId, dto);
   }
 
   // ─────────────────────────────────────────────
@@ -123,6 +136,16 @@ export class ProductController {
     @Param('catId', ParseUUIDPipe) categoryId: string,
   ): Promise<{ message: string }> {
     return this.productService.unlinkCategory(productId, categoryId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Put(':id/status')
+  async updateStatus(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: UpdateProductStatusDto,
+  ): Promise<Product> {
+    return this.productService.updateStatus(productId, dto.status);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

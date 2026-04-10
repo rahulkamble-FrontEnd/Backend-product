@@ -11,6 +11,7 @@ import { UploadProductImageDto } from './dto/upload-product-image.dto';
 import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductService {
@@ -65,6 +66,60 @@ export class ProductService {
     }
 
     return savedProduct;
+  }
+
+  async update(id: string, dto: UpdateProductDto): Promise<Product> {
+    const product = await this.productRepository.findOne({ where: { id } });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${id}" not found`);
+    }
+
+    const updateData: Partial<Product> = {};
+
+    if (dto.name !== undefined) {
+      updateData.name = dto.name;
+      const slug =
+        dto.name
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/[\s_-]+/g, '-')
+          .replace(/^-+|-+$/g, '') +
+        '-' +
+        Date.now().toString().slice(-4);
+      updateData.slug = slug;
+    }
+
+    if (dto.sku !== undefined) updateData.sku = dto.sku;
+    if (dto.brand !== undefined) updateData.brand = dto.brand;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.materialType !== undefined) updateData.materialType = dto.materialType;
+    if (dto.finishType !== undefined) updateData.finishType = dto.finishType;
+    if (dto.colorName !== undefined) updateData.colorName = dto.colorName;
+    if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex;
+    if (dto.thickness !== undefined) updateData.thickness = dto.thickness;
+    if (dto.dimensions !== undefined) updateData.dimensions = dto.dimensions;
+    if (dto.performanceRating !== undefined)
+      updateData.performanceRating = dto.performanceRating;
+    if (dto.durabilityRating !== undefined)
+      updateData.durabilityRating = dto.durabilityRating;
+    if (dto.priceCategory !== undefined)
+      updateData.priceCategory = dto.priceCategory;
+    if (dto.maintenanceRating !== undefined)
+      updateData.maintenanceRating = dto.maintenanceRating;
+    if (dto.bestUsedFor !== undefined) updateData.bestUsedFor = dto.bestUsedFor;
+    if (dto.pros !== undefined) updateData.pros = dto.pros;
+    if (dto.cons !== undefined) updateData.cons = dto.cons;
+    if (dto.status !== undefined) {
+      updateData.status = dto.status === 'published' ? 'active' : dto.status;
+    }
+
+    await this.productRepository.update(id, updateData);
+    const updated = await this.productRepository.findOne({ where: { id } });
+    if (!updated) {
+      throw new NotFoundException(`Product with id "${id}" not found`);
+    }
+    return updated;
   }
 
   async listProducts(
@@ -507,5 +562,25 @@ export class ProductService {
     return {
       message: `Category "${categoryId}" unlinked from product "${productId}"`,
     };
+  }
+
+  async updateStatus(productId: string, status: string): Promise<Product> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const normalizedStatus = status === 'published' ? 'active' : status;
+
+    await this.productRepository.update(productId, { status: normalizedStatus });
+    const updated = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+    if (!updated) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+    return updated;
   }
 }
