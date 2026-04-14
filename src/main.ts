@@ -30,11 +30,15 @@ async function bootstrap() {
    * 3. CORS
    * Allows our front-end application to communicate with this back-end API.
    */
+  // app.enableCors({
+  //   origin: true, // In production, replace with your frontend URL
+  //   credentials: true, // Required for cookies to work
+  // });
   app.enableCors({
-    origin: true, // In production, replace with your frontend URL
-    credentials: true, // Required for cookies to work
+    origin: 'https://main.d2luioc9rp1h71.amplifyapp.com',
+    credentials: true,
   });
-
+  
   /**
    * 4. COOKIE PARSER
    * This middleware allows NestJS to read cookies from incoming requests.
