@@ -19,6 +19,17 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  private getJwtCookieOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+      maxAge: 3600000, // 1 hour
+    };
+  }
+
   /**
    * 1. POST /api/auth/login
    * Validates user and sets an httpOnly JWT cookie
@@ -41,12 +52,8 @@ export class AuthController {
     // Create the token
     const { access_token } = await this.authService.login(user);
 
-    // Set the token as a secure cookie
-    response.cookie('jwt', access_token, {
-      httpOnly: true, // Secure: cookie cannot be accessed via JS
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      maxAge: 3600000, // 1 hour
-    });
+    // Set JWT cookie with cross-site compatible settings in production.
+    response.cookie('jwt', access_token, this.getJwtCookieOptions());
 
     return { message: 'Login successful' };
   }
@@ -57,7 +64,7 @@ export class AuthController {
    */
   @Post('logout')
   async logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('jwt');
+    response.clearCookie('jwt', this.getJwtCookieOptions());
     return { message: 'Logout successful' };
   }
 
