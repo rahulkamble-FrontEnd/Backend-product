@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
+import { extname } from 'path';
 import { BlogPost } from './blog-post.entity';
 import { CreateBlogPostDto } from './dto/create-blog-post.dto';
 import { PublishBlogPostDto } from './dto/publish-blog-post.dto';
@@ -14,6 +16,7 @@ import { PortfolioImage } from '../portfolio/portfolio-image.entity';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { Trending } from '../trending/trending.entity';
 import { CreateTrendingDto } from './dto/create-trending.dto';
+import { S3Service } from '../common/services/s3.service';
 
 @Injectable()
 export class BlogService {
@@ -26,6 +29,7 @@ export class BlogService {
     private readonly portfolioImageRepository: Repository<PortfolioImage>,
     @InjectRepository(Trending)
     private readonly trendingRepository: Repository<Trending>,
+    private readonly s3Service: S3Service,
   ) {}
 
   async listPublished(): Promise<BlogPost[]> {
@@ -47,7 +51,11 @@ export class BlogService {
     return post;
   }
 
-  async createDraft(dto: CreateBlogPostDto, userId: string): Promise<BlogPost> {
+  async createDraft(
+    dto: CreateBlogPostDto,
+    userId: string,
+    featuredImage?: Express.Multer.File,
+  ): Promise<BlogPost> {
     const existingSlug = await this.blogPostRepository.findOne({
       where: { slug: dto.slug },
       select: ['id', 'slug'],
@@ -56,12 +64,24 @@ export class BlogService {
       throw new BadRequestException(`Slug "${dto.slug}" already exists`);
     }
 
+    let featuredImageS3Key = dto.featuredImageS3Key ?? null;
+    if (featuredImage) {
+      const fileExt = extname(featuredImage.originalname).toLowerCase();
+      // Keep blog uploads under a prefix that is already publicly readable in S3.
+      const s3Key = `products/blog/${userId}/${uuidv4()}${fileExt}`;
+      featuredImageS3Key = await this.s3Service.uploadFile(
+        s3Key,
+        featuredImage.buffer,
+        featuredImage.mimetype,
+      );
+    }
+
     const entity = this.blogPostRepository.create({
       title: dto.title,
       slug: dto.slug,
       body: dto.body,
       categoryTag: dto.categoryTag ?? null,
-      featuredImageS3Key: dto.featuredImageS3Key ?? null,
+      featuredImageS3Key,
       status: dto.status ?? 'draft',
       publishedAt: dto.status === 'published' ? new Date() : null,
       author: { id: userId } as any,

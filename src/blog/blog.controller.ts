@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,8 +10,12 @@ import {
   Post,
   Put,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +26,9 @@ import { PublishBlogPostDto } from './dto/publish-blog-post.dto';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { CreateTrendingDto } from './dto/create-trending.dto';
 import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
+
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 @Controller('blog')
 export class BlogController {
@@ -39,8 +47,32 @@ export class BlogController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Post()
-  async createPost(@Body() dto: CreateBlogPostDto, @Req() req: any) {
-    return this.blogService.createDraft(dto, req.user.id);
+  @UseInterceptors(
+    FileInterceptor('featuredImage', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Allowed: jpeg, png, webp`,
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async createPost(
+    @Body() dto: CreateBlogPostDto,
+    @Req() req: any,
+    @UploadedFile() featuredImage?: Express.Multer.File,
+  ) {
+    if (featuredImage && featuredImage.size === 0) {
+      throw new BadRequestException('Uploaded featuredImage is empty');
+    }
+    return this.blogService.createDraft(dto, req.user.id, featuredImage);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
