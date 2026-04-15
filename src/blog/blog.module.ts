@@ -1,8 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlogPost } from './blog-post.entity';
+import { BlogController } from './blog.controller';
+import { BlogService } from './blog.service';
+import { Portfolio } from '../portfolio/portfolio.entity';
+import { PortfolioImage } from '../portfolio/portfolio-image.entity';
+import { Trending } from '../trending/trending.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BlogPost])],
+  imports: [
+    TypeOrmModule.forFeature([BlogPost, Portfolio, PortfolioImage, Trending]),
+  ],
+  controllers: [BlogController],
+  providers: [BlogService],
 })
 export class BlogModule {}
