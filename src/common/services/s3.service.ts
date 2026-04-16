@@ -6,7 +6,9 @@ import {
   PutObjectCommandInput,
   DeleteObjectCommand,
   DeleteObjectCommandInput,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
 export class S3Service {
@@ -79,6 +81,27 @@ export class S3Service {
         error instanceof Error ? error.message : 'Unknown S3 error';
       throw new InternalServerErrorException(
         `Failed to delete file from S3: ${message}`,
+      );
+    }
+  }
+
+  /**
+   * Returns a time-limited signed URL for private bucket object access.
+   */
+  async getSignedObjectUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+      return await getSignedUrl(this.s3Client, command, {
+        expiresIn: expiresInSeconds,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown S3 signing error';
+      throw new InternalServerErrorException(
+        `Failed to generate signed URL: ${message}`,
       );
     }
   }
