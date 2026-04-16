@@ -55,7 +55,7 @@ export class AuthController {
     // Set JWT cookie with cross-site compatible settings in production.
     response.cookie('jwt', access_token, this.getJwtCookieOptions());
 
-    return { message: 'Login successful' };
+    return { message: 'Login successful', access_token };
   }
 
   /**
