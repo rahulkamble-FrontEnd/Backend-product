@@ -34,8 +34,22 @@ async function bootstrap() {
   //   origin: true, // In production, replace with your frontend URL
   //   credentials: true, // Required for cookies to work
   // });
+  const allowedOrigins = [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200',
+    'https://main.d2luioc9rp1h71.amplifyapp.com',
+    'https://product.customfurnish.com',
+  ];
+
   app.enableCors({
-    origin: 'https://main.d2luioc9rp1h71.amplifyapp.com',
+    origin: (origin, callback) => {
+      // Allow non-browser requests (curl/postman) and configured browser origins.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
   });
   
