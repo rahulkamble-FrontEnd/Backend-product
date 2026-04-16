@@ -12,9 +12,9 @@ export class CreateTrendingEntryDto {
   styleTag?: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(500)
-  s3Key: string;
+  s3Key?: string;
 
   @IsString()
   @IsOptional()
