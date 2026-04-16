@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
+import { extname } from 'path';
 import { Trending } from './trending.entity';
 import { CreateTrendingEntryDto } from './dto/create-trending-entry.dto';
 import { S3Service } from '../common/services/s3.service';
@@ -32,11 +38,31 @@ export class TrendingService {
   async create(
     dto: CreateTrendingEntryDto,
     userId: string,
+    image?: Express.Multer.File,
   ): Promise<Trending> {
+    let s3Key = dto.s3Key;
+
+    if (image) {
+      const fileExt = extname(image.originalname).toLowerCase();
+      // Keep trending uploads under a publicly readable product prefix in S3.
+      const generatedKey = `products/trending/${userId}/${uuidv4()}${fileExt}`;
+      s3Key = await this.s3Service.uploadFile(
+        generatedKey,
+        image.buffer,
+        image.mimetype,
+      );
+    }
+
+    if (!s3Key) {
+      throw new BadRequestException(
+        'Either provide "s3Key" or upload an "image" file',
+      );
+    }
+
     const entity = this.trendingRepository.create({
       title: dto.title,
       styleTag: dto.styleTag ?? null,
-      s3Key: dto.s3Key,
+      s3Key,
       caption: dto.caption ?? null,
       createdBy: { id: userId } as any,
     });
