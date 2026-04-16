@@ -38,6 +38,7 @@ async function bootstrap() {
     'http://localhost:4200',
     'http://127.0.0.1:4200',
     'https://main.d2luioc9rp1h71.amplifyapp.com',
+    'https://product.customfurnish.com',
   ];
 
   app.enableCors({
