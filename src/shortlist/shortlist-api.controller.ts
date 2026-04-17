@@ -17,7 +17,7 @@ import { UserRole } from '../user/dto/create-user.dto';
 import { Shortlist } from './shortlist.entity';
 import { AddShortlistItemDto } from './dto/add-shortlist-item.dto';
 import { UpdateShortlistNoteDto } from './dto/update-shortlist-note.dto';
-import { ShortlistApiService } from './shortlist-api.service';
+import { ShortlistApiService, ShortlistListItem } from './shortlist-api.service';
 
 @Controller('shortlist')
 export class ShortlistApiController {
@@ -46,7 +46,7 @@ export class ShortlistApiController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @Get()
-  async list(@Request() req): Promise<Shortlist[]> {
+  async list(@Request() req): Promise<ShortlistListItem[]> {
     return this.shortlistApiService.list(req.user.id);
   }
 
