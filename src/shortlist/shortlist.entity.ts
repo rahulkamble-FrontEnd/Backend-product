@@ -35,7 +35,7 @@ export class Shortlist {
   @Column({
     name: 'sample_status',
     type: 'enum',
-    enum: ['none', 'pending', 'ready', 'collected'],
+    enum: ['none', 'pending', 'ready', 'collected', 'not available'],
     default: 'none',
   })
   sampleStatus: string;
