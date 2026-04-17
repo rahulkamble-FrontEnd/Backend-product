@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
+import { CreateCategoryDto } from './dto/create-category.dto';
 
 @Injectable()
 export class CategoryService {
@@ -29,7 +30,7 @@ export class CategoryService {
     });
   }
 
-  async create(createCategoryDto: any): Promise<Category> {
+  async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
     const { name, type, parent_id } = createCategoryDto;
 
     // Create unique slug from name
@@ -42,7 +43,7 @@ export class CategoryService {
 
     const newCategory = this.categoryRepository.create({
       name,
-      type,
+      type: type ?? 'material',
       slug,
       parent: parent_id ? { id: parent_id } : null,
     });

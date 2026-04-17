@@ -6,6 +6,18 @@ import { Product } from '../product/product.entity';
 import { AddShortlistItemDto } from './dto/add-shortlist-item.dto';
 import { User } from '../user/user.entity';
 import { Notification } from '../notification/notification.entity';
+import { DesignerNote } from '../user/designer-note.entity';
+
+export type ShortlistListItem = Shortlist & {
+  designerReplyNote: string | null;
+  designerReplyUpdatedAt: Date | null;
+  sample_status: string;
+  sample_requested: boolean;
+  sample_requested_at: Date | null;
+  customer_note: string | null;
+  designer_reply_note: string | null;
+  designer_reply_updated_at: Date | null;
+};
 
 @Injectable()
 export class ShortlistApiService {
@@ -18,6 +30,8 @@ export class ShortlistApiService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
+    @InjectRepository(DesignerNote)
+    private readonly designerNotesRepository: Repository<DesignerNote>,
   ) {}
 
   async create(customerId: string, dto: AddShortlistItemDto): Promise<Shortlist> {
@@ -92,14 +106,45 @@ export class ShortlistApiService {
     return savedShortlist;
   }
 
-  async list(customerId: string): Promise<Shortlist[]> {
-    return this.shortlistRepository
+  async list(customerId: string): Promise<ShortlistListItem[]> {
+    const shortlistItems = await this.shortlistRepository
       .createQueryBuilder('shortlist')
       .leftJoinAndSelect('shortlist.product', 'product')
       .leftJoinAndSelect('product.images', 'images')
       .where('shortlist.customerId = :customerId', { customerId })
       .orderBy('shortlist.createdAt', 'DESC')
       .getMany();
+
+    const notes = await this.designerNotesRepository
+      .createQueryBuilder('designerNote')
+      .where('designerNote.customerId = :customerId', { customerId })
+      .andWhere('designerNote.productId IS NOT NULL')
+      .orderBy('designerNote.updatedAt', 'DESC')
+      .getMany();
+
+    const latestNoteByProduct = new Map<string, DesignerNote>();
+    for (const note of notes) {
+      if (!note.productId || latestNoteByProduct.has(note.productId)) {
+        continue;
+      }
+      latestNoteByProduct.set(note.productId, note);
+    }
+
+    return shortlistItems.map((shortlist) => {
+      const latestDesignerNote = latestNoteByProduct.get(shortlist.productId) ?? null;
+
+      return {
+        ...shortlist,
+        designerReplyNote: latestDesignerNote?.note ?? null,
+        designerReplyUpdatedAt: latestDesignerNote?.updatedAt ?? null,
+        sample_status: shortlist.sampleStatus,
+        sample_requested: shortlist.sampleRequested,
+        sample_requested_at: shortlist.sampleRequestedAt,
+        customer_note: shortlist.customerNote,
+        designer_reply_note: latestDesignerNote?.note ?? null,
+        designer_reply_updated_at: latestDesignerNote?.updatedAt ?? null,
+      };
+    });
   }
 
   async updateNote(
