@@ -314,7 +314,12 @@ export class UserService {
   async updateSampleStatus(
     shortlistId: string,
     designerId: string,
-    sampleStatus: 'none' | 'pending' | 'ready' | 'collected',
+    sampleStatus:
+      | 'none'
+      | 'pending'
+      | 'ready'
+      | 'collected'
+      | 'not available',
     isAdmin = false,
   ): Promise<Shortlist> {
     const shortlist = await this.shortlistRepository.findOne({
