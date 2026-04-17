@@ -11,9 +11,9 @@ export class CreateCategoryDto {
   @IsString()
   name: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsEnum(['material', 'furniture'])
-  type: string;
+  type?: string;
 
   @IsOptional()
   @IsUUID()
