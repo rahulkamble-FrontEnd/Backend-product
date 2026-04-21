@@ -549,6 +549,15 @@ export class ProductService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
+    const existingImageCount = await this.productImageRepository.count({
+      where: { productId },
+    });
+    if (existingImageCount >= 3) {
+      throw new BadRequestException(
+        'A product can have maximum 3 images. Delete an existing image before uploading a new one.',
+      );
+    }
+
     // 2. Build a unique S3 key: products/{productId}/{uuid}.ext
     const fileExt = extname(file.originalname).toLowerCase();
     const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
