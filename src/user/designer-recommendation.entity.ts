@@ -27,6 +27,15 @@ export class DesignerRecommendation {
   @Index()
   productId: string;
 
+  @Column({
+    name: 'shortlisted_product_id',
+    type: 'varchar',
+    length: 36,
+    nullable: true,
+  })
+  @Index()
+  shortlistedProductId: string | null;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   note: string | null;
 

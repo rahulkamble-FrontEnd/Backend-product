@@ -13,6 +13,7 @@ import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
 import * as XLSX from 'xlsx';
+import { UserRole } from '../user/dto/create-user.dto';
 
 @Injectable()
 export class ProductService {
@@ -214,7 +215,9 @@ export class ProductService {
 
   async listProducts(
     query: ListProductsQueryDto,
+    requesterRole?: string,
   ): Promise<{ items: unknown[]; total: number; page: number; limit: number }> {
+    const hideBrand = requesterRole === UserRole.CUSTOMER;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const includeImages = query.includeImages === 'true';
@@ -285,7 +288,6 @@ export class ProductService {
         name: p.name,
         slug: p.slug,
         sku: p.sku,
-        brand: p.brand,
         description: p.description,
         materialType: p.materialType,
         finishType: p.finishType,
@@ -304,6 +306,10 @@ export class ProductService {
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       };
+
+      if (!hideBrand) {
+        item.brand = p.brand;
+      }
 
       if (includeImages) {
         item.images = (p.images ?? []).map((img) => ({
@@ -334,7 +340,8 @@ export class ProductService {
     return { items, total, page, limit };
   }
 
-  async getProductBySlug(slug: string): Promise<unknown> {
+  async getProductBySlug(slug: string, requesterRole?: string): Promise<unknown> {
+    const hideBrand = requesterRole === UserRole.CUSTOMER;
     const product = await this.productRepository.findOne({
       where: { slug },
       relations: {
@@ -353,13 +360,11 @@ export class ProductService {
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
 
-    return {
+    const item: Record<string, unknown> = {
       id: product.id,
       name: product.name,
       slug: product.slug,
       sku: product.sku,
-      brand: product.brand,
-      description: product.description,
       materialType: product.materialType,
       finishType: product.finishType,
       colorName: product.colorName,
@@ -394,9 +399,16 @@ export class ProductService {
         isActive: pc.category?.isActive,
       })),
     };
+
+    if (!hideBrand) {
+      item.brand = product.brand;
+    }
+
+    return item;
   }
 
-  async compareProducts(idsParam: string): Promise<unknown> {
+  async compareProducts(idsParam: string, requesterRole?: string): Promise<unknown> {
+    const hideBrand = requesterRole === UserRole.CUSTOMER;
     if (!idsParam) {
       throw new BadRequestException('Query param "ids" is required (comma-separated UUIDs)');
     }
@@ -410,8 +422,8 @@ export class ProductService {
       ),
     );
 
-    if (ids.length === 0) {
-      throw new BadRequestException('At least 1 id is required in "ids"');
+    if (ids.length < 2) {
+      throw new BadRequestException('Minimum 2 ids are required in "ids"');
     }
     if (ids.length > 4) {
       throw new BadRequestException('Maximum 4 ids are allowed in "ids"');
@@ -443,12 +455,11 @@ export class ProductService {
       });
       const primaryImage = images[0];
 
-      return {
+      const item: Record<string, unknown> = {
         id: p.id,
         name: p.name,
         slug: p.slug,
         sku: p.sku,
-        brand: p.brand,
         materialType: p.materialType,
         finishType: p.finishType,
         colorName: p.colorName,
@@ -466,11 +477,16 @@ export class ProductService {
           type: pc.category?.type,
         })),
       };
+
+      if (!hideBrand) {
+        item.brand = p.brand;
+      }
+
+      return item;
     });
 
     const fields = [
       { key: 'name', values: normalized.map((p) => p.name) },
-      { key: 'brand', values: normalized.map((p) => p.brand) },
       { key: 'materialType', values: normalized.map((p) => p.materialType) },
       { key: 'finishType', values: normalized.map((p) => p.finishType) },
       { key: 'colorName', values: normalized.map((p) => p.colorName) },
@@ -482,7 +498,9 @@ export class ProductService {
       { key: 'maintenanceRating', values: normalized.map((p) => p.maintenanceRating) },
     ];
 
-    return { ids, missingIds, products: normalized, fields };
+    const visibleFields = hideBrand ? fields : [{ key: 'brand', values: normalized.map((p) => p.brand) }, ...fields];
+
+    return { ids, missingIds, products: normalized, fields: visibleFields };
   }
 
   async softDeleteProduct(productId: string): Promise<{ message: string }> {
