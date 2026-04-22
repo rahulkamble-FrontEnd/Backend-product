@@ -18,8 +18,10 @@ export class PortfolioService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async listAll(): Promise<unknown[]> {
+  async listAll(category?: string): Promise<unknown[]> {
+    const normalizedCategory = category?.trim();
     const entries = await this.portfolioRepository.find({
+      where: normalizedCategory ? { category: normalizedCategory } : undefined,
       relations: {
         images: true,
       },
@@ -34,6 +36,7 @@ export class PortfolioService {
         title: entry.title,
         roomType: entry.roomType,
         description: entry.description,
+        category: entry.category,
         createdAt: entry.createdAt,
         images: await Promise.all(
           [...(entry.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder).map(
@@ -58,6 +61,7 @@ export class PortfolioService {
       title: dto.title,
       roomType: dto.roomType ?? null,
       description: dto.description ?? null,
+      category: dto.category?.trim() ? dto.category.trim() : null,
       createdBy: { id: userId } as any,
     });
     const savedPortfolio = await this.portfolioRepository.save(portfolio);
