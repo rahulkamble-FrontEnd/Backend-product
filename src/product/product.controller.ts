@@ -10,11 +10,12 @@ import {
   Param,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -137,7 +138,13 @@ export class ProductController {
   @Roles(UserRole.ADMIN)
   @Post(':id/images')
   @UseInterceptors(
-    FileInterceptor('image', {
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'images', maxCount: 3 },
+        { name: 'images[]', maxCount: 3 },
+      ],
+      {
       storage: memoryStorage(), // keep file in memory (buffer) so we can stream to S3
       limits: { fileSize: MAX_SIZE_BYTES },
       fileFilter: (_req, file, cb) => {
@@ -151,19 +158,36 @@ export class ProductController {
         }
         cb(null, true);
       },
-    }),
+      },
+    ),
   )
   async uploadImage(
     @Param('id', ParseUUIDPipe) productId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    filesByField: {
+      image?: Express.Multer.File[];
+      images?: Express.Multer.File[];
+      'images[]'?: Express.Multer.File[];
+    },
     @Body() dto: UploadProductImageDto,
-  ): Promise<ProductImage> {
-    if (!file) {
+  ): Promise<ProductImage | ProductImage[]> {
+    const files = [
+      ...(filesByField?.image ?? []),
+      ...(filesByField?.images ?? []),
+      ...(filesByField?.['images[]'] ?? []),
+    ];
+
+    if (files.length === 0) {
       throw new BadRequestException(
-        'Image file is required. Send it as multipart/form-data with field name "image".',
+        'Image file is required. Send multipart/form-data with one of these field names: "image", "images", or "images[]".',
       );
     }
-    return this.productService.uploadImage(productId, file, dto);
+
+    if (files.length === 1) {
+      return this.productService.uploadImage(productId, files[0], dto);
+    }
+
+    return this.productService.uploadImages(productId, files, dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
