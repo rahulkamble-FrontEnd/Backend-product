@@ -593,6 +593,64 @@ export class ProductService {
     return savedImage;
   }
 
+  async uploadImages(
+    productId: string,
+    files: Express.Multer.File[],
+    dto: UploadProductImageDto,
+  ): Promise<ProductImage[]> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('At least one image file is required');
+    }
+
+    if (files.length > 3) {
+      throw new BadRequestException('You can upload maximum 3 images at a time');
+    }
+
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const existingImageCount = await this.productImageRepository.count({
+      where: { productId },
+    });
+    if (existingImageCount + files.length > 3) {
+      throw new BadRequestException(
+        `A product can have maximum 3 images. This product already has ${existingImageCount} image(s).`,
+      );
+    }
+
+    if (dto.isPrimary) {
+      await this.productImageRepository.update({ productId }, { isPrimary: false });
+    }
+
+    const uploadedImages: ProductImage[] = [];
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      const fileExt = extname(file.originalname).toLowerCase();
+      const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
+      const uploadedKey = await this.s3Service.uploadFile(
+        s3Key,
+        file.buffer,
+        file.mimetype,
+      );
+
+      const productImage = this.productImageRepository.create({
+        productId,
+        s3Key: uploadedKey,
+        displayOrder: (dto.displayOrder ?? 0) + index,
+        isPrimary: dto.isPrimary ? index === 0 : false,
+      });
+      const savedImage = await this.productImageRepository.save(productImage);
+      (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
+      uploadedImages.push(savedImage);
+    }
+
+    return uploadedImages;
+  }
+
   async linkCategories(
     productId: string,
     categoryIds: string[],
