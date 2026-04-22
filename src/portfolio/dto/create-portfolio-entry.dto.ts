@@ -38,6 +38,11 @@ export class CreatePortfolioEntryDto {
   @IsOptional()
   description?: string;
 
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  category?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreatePortfolioEntryImageDto)
