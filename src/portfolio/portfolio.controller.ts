@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Req,
   UploadedFiles,
   UseGuards,
@@ -26,8 +27,8 @@ export class PortfolioController {
   constructor(private readonly portfolioService: PortfolioService) {}
 
   @Get()
-  async listAll() {
-    return this.portfolioService.listAll();
+  async listAll(@Query('category') category?: string) {
+    return this.portfolioService.listAll(category);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

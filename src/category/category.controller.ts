@@ -13,6 +13,7 @@ import { CategoryService } from './category.service';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { CategoryMenuItem } from './category.service';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,6 +26,25 @@ export class CategoryController {
   @Get()
   async findAll(@Query('type') type?: string): Promise<Category[]> {
     return this.categoryService.findAll(type);
+  }
+
+  @Get('menu')
+  async findMenu(
+    @Query('type') type?: string,
+    @Query('productLimit') productLimit?: string,
+    @Query('includeChildren') includeChildren?: string,
+  ): Promise<CategoryMenuItem[]> {
+    const parsedProductLimit = Number.parseInt(productLimit ?? '', 10);
+    const safeProductLimit = Number.isNaN(parsedProductLimit)
+      ? 8
+      : parsedProductLimit;
+    const shouldIncludeChildren =
+      includeChildren === undefined ? true : includeChildren !== 'false';
+    return this.categoryService.findMenu(
+      type,
+      safeProductLimit,
+      shouldIncludeChildren,
+    );
   }
 
   @Get(':slug')
