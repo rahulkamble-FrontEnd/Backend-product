@@ -24,6 +24,9 @@ export class Portfolio {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  category: string | null;
+
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'created_by' })
   createdBy: User;

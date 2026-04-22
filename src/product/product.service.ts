@@ -12,6 +12,7 @@ import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class ProductService {
@@ -32,6 +33,26 @@ export class ProductService {
     user: any,
   ): Promise<Product> {
     const { categoryIds, ...productData } = createProductDto;
+    const normalizedCategoryIds = Array.from(
+      new Set((categoryIds ?? []).map((id) => id?.trim()).filter(Boolean)),
+    );
+
+    if (normalizedCategoryIds.length > 0) {
+      const existingCategories = await this.categoryRepository.find({
+        where: { id: In(normalizedCategoryIds) },
+        select: ['id'],
+      });
+      const existingCategoryIds = new Set(existingCategories.map((cat) => cat.id));
+      const invalidCategoryIds = normalizedCategoryIds.filter(
+        (id) => !existingCategoryIds.has(id),
+      );
+      if (invalidCategoryIds.length > 0) {
+        throw new BadRequestException(
+          `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
+        );
+      }
+    }
+
     if (productData.status === 'published') {
       productData.status = 'active';
     }
@@ -47,25 +68,94 @@ export class ProductService {
       '-' +
       Date.now().toString().slice(-4);
 
-    const newProduct = this.productRepository.create({
-      ...productData,
-      slug,
-      createdBy: { id: user.id } as any,
-    });
+    return this.productRepository.manager.transaction(async (manager) => {
+      const txProductRepository = manager.getRepository(Product);
+      const txProductCategoryRepository = manager.getRepository(ProductCategory);
 
-    const savedProduct = await this.productRepository.save(newProduct);
-
-    if (categoryIds && categoryIds.length > 0) {
-      const productCategories = categoryIds.map((categoryId) => {
-        return this.productCategoryRepository.create({
-          product: { id: savedProduct.id } as any,
-          category: { id: categoryId } as any,
-        });
+      const newProduct = txProductRepository.create({
+        ...productData,
+        slug,
+        createdBy: { id: user.id } as any,
       });
-      await this.productCategoryRepository.save(productCategories);
+
+      const savedProduct = await txProductRepository.save(newProduct);
+
+      if (normalizedCategoryIds.length > 0) {
+        const productCategories = normalizedCategoryIds.map((categoryId) =>
+          txProductCategoryRepository.create({
+            productId: savedProduct.id,
+            categoryId,
+          }),
+        );
+        await txProductCategoryRepository.save(productCategories);
+      }
+
+      return savedProduct;
+    });
+  }
+
+  async bulkCreateFromXlsx(
+    file: Express.Multer.File,
+    user: any,
+  ): Promise<{
+    totalRows: number;
+    createdCount: number;
+    failedCount: number;
+    created: Array<{ row: number; id: string; sku: string; name: string }>;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    if (!file?.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Uploaded spreadsheet is empty');
     }
 
-    return savedProduct;
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      throw new BadRequestException('Spreadsheet does not contain any sheet');
+    }
+
+    const sheet = workbook.Sheets[firstSheetName];
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: null,
+      raw: false,
+    });
+
+    if (rawRows.length === 0) {
+      throw new BadRequestException('Spreadsheet has no data rows');
+    }
+
+    const created: Array<{ row: number; id: string; sku: string; name: string }> = [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    for (let index = 0; index < rawRows.length; index++) {
+      const excelRowNumber = index + 2; // Header row is row 1
+      try {
+        const dto = this.buildCreateProductDtoFromRow(rawRows[index]);
+        const product = await this.create(dto, user);
+        created.push({
+          row: excelRowNumber,
+          id: product.id,
+          sku: product.sku,
+          name: product.name,
+        });
+      } catch (error: unknown) {
+        errors.push({
+          row: excelRowNumber,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to create product for this row',
+        });
+      }
+    }
+
+    return {
+      totalRows: rawRows.length,
+      createdCount: created.length,
+      failedCount: errors.length,
+      created,
+      errors,
+    };
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<Product> {
@@ -459,6 +549,15 @@ export class ProductService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
+    const existingImageCount = await this.productImageRepository.count({
+      where: { productId },
+    });
+    if (existingImageCount >= 3) {
+      throw new BadRequestException(
+        'A product can have maximum 3 images. Delete an existing image before uploading a new one.',
+      );
+    }
+
     // 2. Build a unique S3 key: products/{productId}/{uuid}.ext
     const fileExt = extname(file.originalname).toLowerCase();
     const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
@@ -492,6 +591,64 @@ export class ProductService {
     (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
 
     return savedImage;
+  }
+
+  async uploadImages(
+    productId: string,
+    files: Express.Multer.File[],
+    dto: UploadProductImageDto,
+  ): Promise<ProductImage[]> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('At least one image file is required');
+    }
+
+    if (files.length > 3) {
+      throw new BadRequestException('You can upload maximum 3 images at a time');
+    }
+
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const existingImageCount = await this.productImageRepository.count({
+      where: { productId },
+    });
+    if (existingImageCount + files.length > 3) {
+      throw new BadRequestException(
+        `A product can have maximum 3 images. This product already has ${existingImageCount} image(s).`,
+      );
+    }
+
+    if (dto.isPrimary) {
+      await this.productImageRepository.update({ productId }, { isPrimary: false });
+    }
+
+    const uploadedImages: ProductImage[] = [];
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
+      const fileExt = extname(file.originalname).toLowerCase();
+      const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
+      const uploadedKey = await this.s3Service.uploadFile(
+        s3Key,
+        file.buffer,
+        file.mimetype,
+      );
+
+      const productImage = this.productImageRepository.create({
+        productId,
+        s3Key: uploadedKey,
+        displayOrder: (dto.displayOrder ?? 0) + index,
+        isPrimary: dto.isPrimary ? index === 0 : false,
+      });
+      const savedImage = await this.productImageRepository.save(productImage);
+      (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
+      uploadedImages.push(savedImage);
+    }
+
+    return uploadedImages;
   }
 
   async linkCategories(
@@ -582,5 +739,109 @@ export class ProductService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
     return updated;
+  }
+
+  private buildCreateProductDtoFromRow(row: Record<string, unknown>): CreateProductDto {
+    const normalizedRow: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      normalizedRow[this.normalizeHeaderKey(key)] = value;
+    }
+
+    const name = this.toOptionalString(normalizedRow.name);
+    const sku = this.toOptionalString(normalizedRow.sku);
+
+    if (!name) {
+      throw new BadRequestException('Missing required field "name"');
+    }
+    if (!sku) {
+      throw new BadRequestException('Missing required field "sku"');
+    }
+
+    const status = this.toOptionalString(normalizedRow.status);
+    if (
+      status &&
+      !['draft', 'active', 'archived', 'published'].includes(status.toLowerCase())
+    ) {
+      throw new BadRequestException(
+        `Invalid status "${status}". Allowed: draft, active, archived, published`,
+      );
+    }
+
+    return {
+      name,
+      sku,
+      brand: this.toOptionalString(normalizedRow.brand),
+      description: this.toOptionalString(normalizedRow.description),
+      materialType: this.toOptionalString(normalizedRow.materialtype),
+      finishType: this.toOptionalString(normalizedRow.finishtype),
+      colorName: this.toOptionalString(normalizedRow.colorname),
+      colorHex: this.toOptionalString(normalizedRow.colorhex),
+      thickness: this.toOptionalString(normalizedRow.thickness),
+      dimensions: this.toOptionalString(normalizedRow.dimensions),
+      performanceRating: this.toOptionalNumber(normalizedRow.performancerating),
+      durabilityRating: this.toOptionalNumber(normalizedRow.durabilityrating),
+      priceCategory: this.toOptionalNumber(normalizedRow.pricecategory),
+      maintenanceRating: this.toOptionalNumber(normalizedRow.maintenancerating),
+      bestUsedFor: this.toOptionalStringArray(normalizedRow.bestusedfor),
+      pros: this.toOptionalStringArray(normalizedRow.pros),
+      cons: this.toOptionalStringArray(normalizedRow.cons),
+      status: status?.toLowerCase(),
+      categoryIds: this.toOptionalStringArray(normalizedRow.categoryids),
+    };
+  }
+
+  private normalizeHeaderKey(input: string): string {
+    return input.toLowerCase().replace(/[\s_-]+/g, '');
+  }
+
+  private toOptionalString(value: unknown): string | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    const text = String(value).trim();
+    return text.length > 0 ? text : undefined;
+  }
+
+  private toOptionalNumber(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+    const num = Number(value);
+    if (Number.isNaN(num)) {
+      throw new BadRequestException(`Invalid number value "${String(value)}"`);
+    }
+    return num;
+  }
+
+  private toOptionalStringArray(value: unknown): string[] | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (Array.isArray(value)) {
+      const arr = value.map((item) => String(item).trim()).filter(Boolean);
+      return arr.length > 0 ? arr : undefined;
+    }
+    const str = String(value).trim();
+    if (!str) {
+      return undefined;
+    }
+
+    if (str.startsWith('[') && str.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(str);
+        if (Array.isArray(parsed)) {
+          const arr = parsed.map((item) => String(item).trim()).filter(Boolean);
+          return arr.length > 0 ? arr : undefined;
+        }
+      } catch {
+        // Fallback to comma split below
+      }
+    }
+
+    const arr = str
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return arr.length > 0 ? arr : undefined;
   }
 }

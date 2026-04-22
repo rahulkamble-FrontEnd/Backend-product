@@ -10,11 +10,12 @@ import {
   Param,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -32,6 +33,11 @@ import { UserRole } from '../user/dto/create-user.dto';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_SPREADSHEET_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
+const MAX_SPREADSHEET_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 @Controller('products')
 export class ProductController {
@@ -73,6 +79,49 @@ export class ProductController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Post('bulk-upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_SPREADSHEET_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        const hasXlsxExtension = file.originalname.toLowerCase().endsWith('.xlsx');
+        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(file.mimetype);
+        const isGenericBinaryXlsx =
+          file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+
+        if (!allowedMimeType && !isGenericBinaryXlsx) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async bulkUploadProducts(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ): Promise<{
+    totalRows: number;
+    createdCount: number;
+    failedCount: number;
+    created: Array<{ row: number; id: string; sku: string; name: string }>;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    if (!file) {
+      throw new BadRequestException(
+        'Spreadsheet file is required. Send it as multipart/form-data with field name "file".',
+      );
+    }
+    return this.productService.bulkCreateFromXlsx(file, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Put(':id')
   async update(
     @Param('id', ParseUUIDPipe) productId: string,
@@ -89,7 +138,13 @@ export class ProductController {
   @Roles(UserRole.ADMIN)
   @Post(':id/images')
   @UseInterceptors(
-    FileInterceptor('image', {
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'images', maxCount: 3 },
+        { name: 'images[]', maxCount: 3 },
+      ],
+      {
       storage: memoryStorage(), // keep file in memory (buffer) so we can stream to S3
       limits: { fileSize: MAX_SIZE_BYTES },
       fileFilter: (_req, file, cb) => {
@@ -103,19 +158,36 @@ export class ProductController {
         }
         cb(null, true);
       },
-    }),
+      },
+    ),
   )
   async uploadImage(
     @Param('id', ParseUUIDPipe) productId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    filesByField: {
+      image?: Express.Multer.File[];
+      images?: Express.Multer.File[];
+      'images[]'?: Express.Multer.File[];
+    },
     @Body() dto: UploadProductImageDto,
-  ): Promise<ProductImage> {
-    if (!file) {
+  ): Promise<ProductImage | ProductImage[]> {
+    const files = [
+      ...(filesByField?.image ?? []),
+      ...(filesByField?.images ?? []),
+      ...(filesByField?.['images[]'] ?? []),
+    ];
+
+    if (files.length === 0) {
       throw new BadRequestException(
-        'Image file is required. Send it as multipart/form-data with field name "image".',
+        'Image file is required. Send multipart/form-data with one of these field names: "image", "images", or "images[]".',
       );
     }
-    return this.productService.uploadImage(productId, file, dto);
+
+    if (files.length === 1) {
+      return this.productService.uploadImage(productId, files[0], dto);
+    }
+
+    return this.productService.uploadImages(productId, files, dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
