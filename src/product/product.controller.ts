@@ -32,6 +32,11 @@ import { UserRole } from '../user/dto/create-user.dto';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_SPREADSHEET_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
+const MAX_SPREADSHEET_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 @Controller('products')
 export class ProductController {
@@ -69,6 +74,49 @@ export class ProductController {
     @Req() req: any,
   ): Promise<Product> {
     return this.productService.create(createProductDto, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post('bulk-upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_SPREADSHEET_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        const hasXlsxExtension = file.originalname.toLowerCase().endsWith('.xlsx');
+        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(file.mimetype);
+        const isGenericBinaryXlsx =
+          file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+
+        if (!allowedMimeType && !isGenericBinaryXlsx) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async bulkUploadProducts(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ): Promise<{
+    totalRows: number;
+    createdCount: number;
+    failedCount: number;
+    created: Array<{ row: number; id: string; sku: string; name: string }>;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    if (!file) {
+      throw new BadRequestException(
+        'Spreadsheet file is required. Send it as multipart/form-data with field name "file".',
+      );
+    }
+    return this.productService.bulkCreateFromXlsx(file, req.user);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
