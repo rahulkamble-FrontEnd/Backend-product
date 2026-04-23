@@ -805,6 +805,26 @@ export class ProductService {
     };
   }
 
+  async getLinkedTags(productId: string): Promise<Tag[]> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+      select: ['id'],
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const links = await this.productTagRepository.find({
+      where: { productId },
+      relations: { tag: true },
+      order: { id: 'ASC' },
+    });
+
+    return links
+      .map((link) => link.tag)
+      .filter((tag): tag is Tag => Boolean(tag));
+  }
+
   async unlinkTag(productId: string, tagId: string): Promise<{ message: string }> {
     const product = await this.productRepository.findOne({
       where: { id: productId },

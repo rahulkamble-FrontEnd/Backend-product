@@ -217,6 +217,24 @@ export class ProductController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Get(':id/tags')
+  async getLinkedTags(
+    @Param('id', ParseUUIDPipe) productId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      hexCode: string;
+      createdBy: string | null;
+      createdAt: Date;
+    }>
+  > {
+    return this.productService.getLinkedTags(productId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Post(':id/tags')
   async linkTag(
     @Param('id', ParseUUIDPipe) productId: string,
