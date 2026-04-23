@@ -9,6 +9,10 @@ export class CreateDesignerRecommendationDto {
   @IsNotEmpty()
   productId: string;
 
+  @IsUUID()
+  @IsNotEmpty()
+  shortlistedProductId: string;
+
   @IsString()
   @IsOptional()
   note?: string;
