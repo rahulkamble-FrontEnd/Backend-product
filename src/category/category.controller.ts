@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Req,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { Category } from './category.entity';
@@ -18,6 +19,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('categories')
 export class CategoryController {
@@ -28,11 +30,13 @@ export class CategoryController {
     return this.categoryService.findAll(type);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('menu')
   async findMenu(
     @Query('type') type?: string,
     @Query('productLimit') productLimit?: string,
     @Query('includeChildren') includeChildren?: string,
+    @Req() req?: any,
   ): Promise<CategoryMenuItem[]> {
     const parsedProductLimit = Number.parseInt(productLimit ?? '', 10);
     const safeProductLimit = Number.isNaN(parsedProductLimit)
@@ -44,6 +48,7 @@ export class CategoryController {
       type,
       safeProductLimit,
       shouldIncludeChildren,
+      req?.user?.role,
     );
   }
 

@@ -11,6 +11,7 @@ import { NotificationModule } from './notification/notification.module';
 import { BlogModule } from './blog/blog.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { TrendingModule } from './trending/trending.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { TrendingModule } from './trending/trending.module';
     BlogModule,
     PortfolioModule,
     TrendingModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [],
