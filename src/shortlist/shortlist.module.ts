@@ -5,6 +5,7 @@ import { Product } from '../product/product.entity';
 import { User } from '../user/user.entity';
 import { Notification } from '../notification/notification.entity';
 import { DesignerNote } from '../user/designer-note.entity';
+import { DesignerRecommendation } from '../user/designer-recommendation.entity';
 import { ShortlistApiController } from './shortlist-api.controller';
 import { ShortlistApiService } from './shortlist-api.service';
 
@@ -16,6 +17,7 @@ import { ShortlistApiService } from './shortlist-api.service';
       User,
       Notification,
       DesignerNote,
+      DesignerRecommendation,
     ]),
   ],
   controllers: [ShortlistApiController],

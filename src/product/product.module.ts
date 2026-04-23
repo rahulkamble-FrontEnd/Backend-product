@@ -7,6 +7,9 @@ import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { ProductTag } from './product-tag.entity';
+import { Tag } from '../tags/tag.entity';
 
 @Module({
   imports: [
@@ -15,9 +18,11 @@ import { Category } from '../category/category.entity';
       ProductCategory,
       ProductImage,
       Category,
+      ProductTag,
+      Tag,
     ]),
   ],
   controllers: [ProductController],
-  providers: [ProductService, S3Service],
+  providers: [ProductService, S3Service, OptionalJwtAuthGuard],
 })
 export class ProductModule {}
