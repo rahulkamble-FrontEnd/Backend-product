@@ -8,6 +8,8 @@ import { ProductService } from './product.service';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { ProductTag } from './product-tag.entity';
+import { Tag } from '../tags/tag.entity';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
       ProductCategory,
       ProductImage,
       Category,
+      ProductTag,
+      Tag,
     ]),
   ],
   controllers: [ProductController],

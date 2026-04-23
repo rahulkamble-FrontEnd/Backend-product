@@ -14,6 +14,8 @@ import { Category } from '../category/category.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
 import * as XLSX from 'xlsx';
 import { UserRole } from '../user/dto/create-user.dto';
+import { ProductTag } from './product-tag.entity';
+import { Tag } from '../tags/tag.entity';
 
 @Injectable()
 export class ProductService {
@@ -26,6 +28,10 @@ export class ProductService {
     private readonly productImageRepository: Repository<ProductImage>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(ProductTag)
+    private readonly productTagRepository: Repository<ProductTag>,
+    @InjectRepository(Tag)
+    private readonly tagRepository: Repository<Tag>,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -757,6 +763,73 @@ export class ProductService {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
     return updated;
+  }
+
+  async linkTag(
+    productId: string,
+    tagId: string,
+  ): Promise<{ message: string; linked: boolean }> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+      select: ['id'],
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const tag = await this.tagRepository.findOne({
+      where: { id: tagId },
+      select: ['id'],
+    });
+    if (!tag) {
+      throw new NotFoundException(`Tag with id "${tagId}" not found`);
+    }
+
+    const existing = await this.productTagRepository.findOne({
+      where: { productId, tagId },
+      select: ['id'],
+    });
+    if (existing) {
+      return {
+        message: `Tag "${tagId}" is already linked to product "${productId}"`,
+        linked: false,
+      };
+    }
+
+    const entity = this.productTagRepository.create({ productId, tagId });
+    await this.productTagRepository.save(entity);
+
+    return {
+      message: `Tag "${tagId}" linked to product "${productId}"`,
+      linked: true,
+    };
+  }
+
+  async unlinkTag(productId: string, tagId: string): Promise<{ message: string }> {
+    const product = await this.productRepository.findOne({
+      where: { id: productId },
+      select: ['id'],
+    });
+    if (!product) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const tag = await this.tagRepository.findOne({
+      where: { id: tagId },
+      select: ['id'],
+    });
+    if (!tag) {
+      throw new NotFoundException(`Tag with id "${tagId}" not found`);
+    }
+
+    const result = await this.productTagRepository.delete({ productId, tagId });
+    if ((result.affected ?? 0) === 0) {
+      throw new NotFoundException(
+        `Tag "${tagId}" is not linked to product "${productId}"`,
+      );
+    }
+
+    return { message: `Tag "${tagId}" unlinked from product "${productId}"` };
   }
 
   private buildCreateProductDtoFromRow(row: Record<string, unknown>): CreateProductDto {

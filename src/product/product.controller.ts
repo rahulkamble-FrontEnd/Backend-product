@@ -31,6 +31,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { LinkProductTagDto } from './dto/link-product-tag.dto';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -212,6 +213,26 @@ export class ProductController {
     @Param('catId', ParseUUIDPipe) categoryId: string,
   ): Promise<{ message: string }> {
     return this.productService.unlinkCategory(productId, categoryId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post(':id/tags')
+  async linkTag(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: LinkProductTagDto,
+  ): Promise<{ message: string; linked: boolean }> {
+    return this.productService.linkTag(productId, dto.tagId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id/tags/:tagId')
+  async unlinkTag(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.unlinkTag(productId, tagId);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
