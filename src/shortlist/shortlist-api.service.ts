@@ -7,8 +7,10 @@ import { AddShortlistItemDto } from './dto/add-shortlist-item.dto';
 import { User } from '../user/user.entity';
 import { Notification } from '../notification/notification.entity';
 import { DesignerNote } from '../user/designer-note.entity';
+import { DesignerRecommendation } from '../user/designer-recommendation.entity';
 
 export type ShortlistListItem = Shortlist & {
+  recommendations: DesignerRecommendation[];
   designerReplyNote: string | null;
   designerReplyUpdatedAt: Date | null;
   sample_status: string;
@@ -32,6 +34,8 @@ export class ShortlistApiService {
     private readonly notificationRepository: Repository<Notification>,
     @InjectRepository(DesignerNote)
     private readonly designerNotesRepository: Repository<DesignerNote>,
+    @InjectRepository(DesignerRecommendation)
+    private readonly designerRecommendationsRepository: Repository<DesignerRecommendation>,
   ) {}
 
   async create(customerId: string, dto: AddShortlistItemDto): Promise<Shortlist> {
@@ -122,6 +126,14 @@ export class ShortlistApiService {
       .orderBy('designerNote.updatedAt', 'DESC')
       .getMany();
 
+    const recommendations = await this.designerRecommendationsRepository
+      .createQueryBuilder('designerRecommendation')
+      .leftJoinAndSelect('designerRecommendation.product', 'product')
+      .leftJoinAndSelect('product.images', 'images')
+      .where('designerRecommendation.customerId = :customerId', { customerId })
+      .orderBy('designerRecommendation.createdAt', 'DESC')
+      .getMany();
+
     const latestNoteByProduct = new Map<string, DesignerNote>();
     for (const note of notes) {
       if (!note.productId || latestNoteByProduct.has(note.productId)) {
@@ -130,11 +142,24 @@ export class ShortlistApiService {
       latestNoteByProduct.set(note.productId, note);
     }
 
+    const recommendationsByProduct = recommendations.reduce<
+      Record<string, DesignerRecommendation[]>
+    >((acc, recommendation) => {
+      const recommendationGroupKey =
+        recommendation.shortlistedProductId || recommendation.productId;
+      if (!acc[recommendationGroupKey]) {
+        acc[recommendationGroupKey] = [];
+      }
+      acc[recommendationGroupKey].push(recommendation);
+      return acc;
+    }, {});
+
     return shortlistItems.map((shortlist) => {
       const latestDesignerNote = latestNoteByProduct.get(shortlist.productId) ?? null;
 
       return {
         ...shortlist,
+        recommendations: recommendationsByProduct[shortlist.productId] ?? [],
         designerReplyNote: latestDesignerNote?.note ?? null,
         designerReplyUpdatedAt: latestDesignerNote?.updatedAt ?? null,
         sample_status: shortlist.sampleStatus,
