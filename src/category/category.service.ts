@@ -5,13 +5,14 @@ import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { ProductCategory } from '../product/product-category.entity';
 import { Product } from '../product/product.entity';
+import { UserRole } from '../user/dto/create-user.dto';
 
 export interface CategoryMenuProduct {
   id: string;
   name: string;
   slug: string;
   sku: string;
-  brand: string | null;
+  brand?: string | null;
 }
 
 export interface CategoryMenuItem {
@@ -57,7 +58,9 @@ export class CategoryService {
     type?: string,
     productLimit = 8,
     includeChildren = true,
+    requesterRole?: string,
   ): Promise<CategoryMenuItem[]> {
+    const hideBrand = requesterRole === UserRole.CUSTOMER;
     const safeProductLimit = Math.min(Math.max(productLimit, 1), 20);
 
     const categoriesQuery = this.categoryRepository
@@ -125,13 +128,16 @@ export class CategoryService {
       }
 
       idsSet.add(product.id);
-      products.push({
+      const item: CategoryMenuProduct = {
         id: product.id,
         name: product.name,
         slug: product.slug,
         sku: product.sku,
-        brand: product.brand ?? null,
-      });
+      };
+      if (!hideBrand) {
+        item.brand = product.brand ?? null;
+      }
+      products.push(item);
     }
 
     const childrenByParentId = new Map<string, CategoryMenuItem[]>();

@@ -30,6 +30,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { LinkProductTagDto } from './dto/link-product-tag.dto';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -43,24 +45,27 @@ const MAX_SPREADSHEET_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  async list(@Query() query: ListProductsQueryDto): Promise<{
+  async list(@Query() query: ListProductsQueryDto, @Req() req: any): Promise<{
     items: unknown[];
     total: number;
     page: number;
     limit: number;
   }> {
-    return this.productService.listProducts(query);
+    return this.productService.listProducts(query, req.user?.role);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('compare')
-  async compare(@Query('ids') ids: string): Promise<unknown> {
-    return this.productService.compareProducts(ids);
+  async compare(@Query('ids') ids: string, @Req() req: any): Promise<unknown> {
+    return this.productService.compareProducts(ids, req.user?.role);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
-  async getBySlug(@Param('slug') slug: string): Promise<unknown> {
-    return this.productService.getProductBySlug(slug);
+  async getBySlug(@Param('slug') slug: string, @Req() req: any): Promise<unknown> {
+    return this.productService.getProductBySlug(slug, req.user?.role);
   }
 
   // ─────────────────────────────────────────────
@@ -208,6 +213,44 @@ export class ProductController {
     @Param('catId', ParseUUIDPipe) categoryId: string,
   ): Promise<{ message: string }> {
     return this.productService.unlinkCategory(productId, categoryId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get(':id/tags')
+  async getLinkedTags(
+    @Param('id', ParseUUIDPipe) productId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      hexCode: string;
+      createdBy: string | null;
+      createdAt: Date;
+    }>
+  > {
+    return this.productService.getLinkedTags(productId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post(':id/tags')
+  async linkTag(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: LinkProductTagDto,
+  ): Promise<{ message: string; linked: boolean }> {
+    return this.productService.linkTag(productId, dto.tagId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':id/tags/:tagId')
+  async unlinkTag(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Param('tagId', ParseUUIDPipe) tagId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.unlinkTag(productId, tagId);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

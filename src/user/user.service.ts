@@ -168,8 +168,13 @@ export class UserService {
     skipOwnershipCheck = false,
   ): Promise<{
     customer: User;
-    shortlist: Shortlist[];
+    shortlist: Array<
+      Shortlist & {
+        recommendations: DesignerRecommendation[];
+      }
+    >;
     notes: DesignerNote[];
+    recommendations: DesignerRecommendation[];
   }> {
     const customer = await this.usersRepository.findOne({
       where: { id: customerId, role: UserRole.CUSTOMER },
@@ -204,6 +209,34 @@ export class UserService {
       .orderBy('designerNote.updatedAt', 'DESC')
       .getMany();
 
+    const recommendations = await this.designerRecommendationsRepository
+      .createQueryBuilder('designerRecommendation')
+      .leftJoinAndSelect('designerRecommendation.product', 'product')
+      .leftJoinAndSelect('product.images', 'images')
+      .where('designerRecommendation.customerId = :customerId', { customerId })
+      .andWhere('designerRecommendation.designerId = :designerId', {
+        designerId,
+      })
+      .orderBy('designerRecommendation.createdAt', 'DESC')
+      .getMany();
+
+    const recommendationsByProductId = recommendations.reduce<
+      Record<string, DesignerRecommendation[]>
+    >((acc, recommendation) => {
+      const recommendationGroupKey =
+        recommendation.shortlistedProductId || recommendation.productId;
+      if (!acc[recommendationGroupKey]) {
+        acc[recommendationGroupKey] = [];
+      }
+      acc[recommendationGroupKey].push(recommendation);
+      return acc;
+    }, {});
+
+    const shortlistWithRecommendations = shortlist.map((item) => ({
+      ...item,
+      recommendations: recommendationsByProductId[item.productId] ?? [],
+    }));
+
     const {
       passwordHash,
       resetPasswordToken,
@@ -213,8 +246,9 @@ export class UserService {
 
     return {
       customer: customerWithoutSensitiveFields as User,
-      shortlist,
+      shortlist: shortlistWithRecommendations,
       notes,
+      recommendations,
     };
   }
 
@@ -285,6 +319,7 @@ export class UserService {
     designerId: string,
     customerId: string,
     productId: string,
+    shortlistedProductId: string,
     note?: string,
     isAdmin = false,
   ): Promise<DesignerRecommendation> {
@@ -301,10 +336,27 @@ export class UserService {
       throw new ForbiddenException('Customer is not assigned to you');
     }
 
+    const shortlistItem = await this.shortlistRepository.findOne({
+      where: {
+        customerId,
+        productId: shortlistedProductId,
+      },
+    });
+    if (!shortlistItem) {
+      throw new NotFoundException('Shortlisted product context not found');
+    }
+
+    if (productId === shortlistedProductId) {
+      throw new ConflictException(
+        'Recommended product must be different from shortlisted product',
+      );
+    }
+
     const recommendation = this.designerRecommendationsRepository.create({
       designerId,
       customerId,
       productId,
+      shortlistedProductId,
       note: note || null,
     });
 
