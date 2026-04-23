@@ -137,6 +137,7 @@ export class DesignerController {
       effectiveDesignerId,
       dto.customerId,
       dto.productId,
+      dto.shortlistedProductId,
       dto.note,
       isAdmin,
     );
