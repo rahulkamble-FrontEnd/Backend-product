@@ -12,6 +12,7 @@ import {
 import { User } from '../user/user.entity';
 import { ProductCategory } from './product-category.entity';
 import { ProductImage } from './product-image.entity';
+import { ProductTag } from './product-tag.entity';
 
 @Entity('products')
 export class Product {
@@ -105,4 +106,7 @@ export class Product {
 
   @OneToMany(() => ProductImage, (productImage) => productImage.product)
   images: ProductImage[];
+
+  @OneToMany(() => ProductTag, (productTag) => productTag.product)
+  productTags: ProductTag[];
 }
