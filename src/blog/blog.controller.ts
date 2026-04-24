@@ -98,9 +98,7 @@ export class BlogController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Put(':id/publish')
-  async togglePublished(
-    @Param('id', ParseUUIDPipe) postId: string,
-  ) {
+  async togglePublished(@Param('id', ParseUUIDPipe) postId: string) {
     return this.blogService.togglePublished(postId);
   }
 

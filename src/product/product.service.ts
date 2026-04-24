@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -47,15 +51,26 @@ export class ProductService {
     if (normalizedCategoryIds.length > 0) {
       const existingCategories = await this.categoryRepository.find({
         where: { id: In(normalizedCategoryIds) },
-        select: ['id'],
+        relations: ['parent'],
       });
-      const existingCategoryIds = new Set(existingCategories.map((cat) => cat.id));
+      const existingCategoryIds = new Set(
+        existingCategories.map((cat) => cat.id),
+      );
       const invalidCategoryIds = normalizedCategoryIds.filter(
         (id) => !existingCategoryIds.has(id),
       );
       if (invalidCategoryIds.length > 0) {
         throw new BadRequestException(
           `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
+        );
+      }
+
+      const nonSubCategoryIds = existingCategories
+        .filter((cat) => !cat.parent)
+        .map((cat) => cat.id);
+      if (nonSubCategoryIds.length > 0) {
+        throw new BadRequestException(
+          `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
         );
       }
     }
@@ -77,7 +92,8 @@ export class ProductService {
 
     return this.productRepository.manager.transaction(async (manager) => {
       const txProductRepository = manager.getRepository(Product);
-      const txProductCategoryRepository = manager.getRepository(ProductCategory);
+      const txProductCategoryRepository =
+        manager.getRepository(ProductCategory);
 
       const newProduct = txProductRepository.create({
         ...productData,
@@ -131,7 +147,12 @@ export class ProductService {
       throw new BadRequestException('Spreadsheet has no data rows');
     }
 
-    const created: Array<{ row: number; id: string; sku: string; name: string }> = [];
+    const created: Array<{
+      row: number;
+      id: string;
+      sku: string;
+      name: string;
+    }> = [];
     const errors: Array<{ row: number; message: string }> = [];
 
     for (let index = 0; index < rawRows.length; index++) {
@@ -190,7 +211,8 @@ export class ProductService {
     if (dto.sku !== undefined) updateData.sku = dto.sku;
     if (dto.brand !== undefined) updateData.brand = dto.brand;
     if (dto.description !== undefined) updateData.description = dto.description;
-    if (dto.materialType !== undefined) updateData.materialType = dto.materialType;
+    if (dto.materialType !== undefined)
+      updateData.materialType = dto.materialType;
     if (dto.finishType !== undefined) updateData.finishType = dto.finishType;
     if (dto.colorName !== undefined) updateData.colorName = dto.colorName;
     if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex;
@@ -346,7 +368,10 @@ export class ProductService {
     return { items, total, page, limit };
   }
 
-  async getProductBySlug(slug: string, requesterRole?: string): Promise<unknown> {
+  async getProductBySlug(
+    slug: string,
+    requesterRole?: string,
+  ): Promise<unknown> {
     const hideBrand = requesterRole === UserRole.CUSTOMER;
     const product = await this.productRepository.findOne({
       where: { slug },
@@ -413,10 +438,15 @@ export class ProductService {
     return item;
   }
 
-  async compareProducts(idsParam: string, requesterRole?: string): Promise<unknown> {
+  async compareProducts(
+    idsParam: string,
+    requesterRole?: string,
+  ): Promise<unknown> {
     const hideBrand = requesterRole === UserRole.CUSTOMER;
     if (!idsParam) {
-      throw new BadRequestException('Query param "ids" is required (comma-separated UUIDs)');
+      throw new BadRequestException(
+        'Query param "ids" is required (comma-separated UUIDs)',
+      );
     }
 
     const ids = Array.from(
@@ -439,7 +469,9 @@ export class ProductService {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const invalid = ids.filter((id) => !uuidV4.test(id));
     if (invalid.length > 0) {
-      throw new BadRequestException(`Invalid UUID(s) in "ids": ${invalid.join(', ')}`);
+      throw new BadRequestException(
+        `Invalid UUID(s) in "ids": ${invalid.join(', ')}`,
+      );
     }
 
     const products = await this.productRepository.find({
@@ -456,7 +488,8 @@ export class ProductService {
     const normalized = products.map((p) => {
       const images = [...(p.images ?? [])].sort((a, b) => {
         if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+        if (a.displayOrder !== b.displayOrder)
+          return a.displayOrder - b.displayOrder;
         return a.createdAt.getTime() - b.createdAt.getTime();
       });
       const primaryImage = images[0];
@@ -475,7 +508,9 @@ export class ProductService {
         durabilityRating: p.durabilityRating,
         priceCategory: p.priceCategory,
         maintenanceRating: p.maintenanceRating,
-        primaryImageUrl: primaryImage ? this.s3Service.getPublicUrl(primaryImage.s3Key) : null,
+        primaryImageUrl: primaryImage
+          ? this.s3Service.getPublicUrl(primaryImage.s3Key)
+          : null,
         categories: (p.productCategories ?? []).map((pc) => ({
           categoryId: pc.categoryId,
           name: pc.category?.name,
@@ -498,13 +533,24 @@ export class ProductService {
       { key: 'colorName', values: normalized.map((p) => p.colorName) },
       { key: 'thickness', values: normalized.map((p) => p.thickness) },
       { key: 'dimensions', values: normalized.map((p) => p.dimensions) },
-      { key: 'performanceRating', values: normalized.map((p) => p.performanceRating) },
-      { key: 'durabilityRating', values: normalized.map((p) => p.durabilityRating) },
+      {
+        key: 'performanceRating',
+        values: normalized.map((p) => p.performanceRating),
+      },
+      {
+        key: 'durabilityRating',
+        values: normalized.map((p) => p.durabilityRating),
+      },
       { key: 'priceCategory', values: normalized.map((p) => p.priceCategory) },
-      { key: 'maintenanceRating', values: normalized.map((p) => p.maintenanceRating) },
+      {
+        key: 'maintenanceRating',
+        values: normalized.map((p) => p.maintenanceRating),
+      },
     ];
 
-    const visibleFields = hideBrand ? fields : [{ key: 'brand', values: normalized.map((p) => p.brand) }, ...fields];
+    const visibleFields = hideBrand
+      ? fields
+      : [{ key: 'brand', values: normalized.map((p) => p.brand) }, ...fields];
 
     return { ids, missingIds, products: normalized, fields: visibleFields };
   }
@@ -627,7 +673,9 @@ export class ProductService {
     }
 
     if (files.length > 3) {
-      throw new BadRequestException('You can upload maximum 3 images at a time');
+      throw new BadRequestException(
+        'You can upload maximum 3 images at a time',
+      );
     }
 
     const product = await this.productRepository.findOne({
@@ -647,7 +695,10 @@ export class ProductService {
     }
 
     if (dto.isPrimary) {
-      await this.productImageRepository.update({ productId }, { isPrimary: false });
+      await this.productImageRepository.update(
+        { productId },
+        { isPrimary: false },
+      );
     }
 
     const uploadedImages: ProductImage[] = [];
@@ -687,9 +738,12 @@ export class ProductService {
     }
     const validCategories = await this.categoryRepository.find({
       where: { id: In(categoryIds) },
-      select: ['id'],
+      relations: ['parent'],
     });
-    const validIds = validCategories.map((c) => c.id);
+    const validSubCategories = validCategories.filter(
+      (category) => category.parent,
+    );
+    const validIds = validSubCategories.map((c) => c.id);
     const invalid = categoryIds.filter((id) => !validIds.includes(id));
     const existing = await this.productCategoryRepository.find({
       where: { productId, categoryId: In(validIds) },
@@ -755,7 +809,9 @@ export class ProductService {
 
     const normalizedStatus = status === 'published' ? 'active' : status;
 
-    await this.productRepository.update(productId, { status: normalizedStatus });
+    await this.productRepository.update(productId, {
+      status: normalizedStatus,
+    });
     const updated = await this.productRepository.findOne({
       where: { id: productId },
     });
@@ -825,7 +881,10 @@ export class ProductService {
       .filter((tag): tag is Tag => Boolean(tag));
   }
 
-  async unlinkTag(productId: string, tagId: string): Promise<{ message: string }> {
+  async unlinkTag(
+    productId: string,
+    tagId: string,
+  ): Promise<{ message: string }> {
     const product = await this.productRepository.findOne({
       where: { id: productId },
       select: ['id'],
@@ -852,7 +911,9 @@ export class ProductService {
     return { message: `Tag "${tagId}" unlinked from product "${productId}"` };
   }
 
-  private buildCreateProductDtoFromRow(row: Record<string, unknown>): CreateProductDto {
+  private buildCreateProductDtoFromRow(
+    row: Record<string, unknown>,
+  ): CreateProductDto {
     const normalizedRow: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
       normalizedRow[this.normalizeHeaderKey(key)] = value;
@@ -871,7 +932,9 @@ export class ProductService {
     const status = this.toOptionalString(normalizedRow.status);
     if (
       status &&
-      !['draft', 'active', 'archived', 'published'].includes(status.toLowerCase())
+      !['draft', 'active', 'archived', 'published'].includes(
+        status.toLowerCase(),
+      )
     ) {
       throw new BadRequestException(
         `Invalid status "${status}". Allowed: draft, active, archived, published`,
@@ -897,7 +960,9 @@ export class ProductService {
       pros: this.toOptionalStringArray(normalizedRow.pros),
       cons: this.toOptionalStringArray(normalizedRow.cons),
       status: status?.toLowerCase(),
-      categoryIds: this.toOptionalStringArray(normalizedRow.categoryids),
+      categoryIds:
+        this.toOptionalStringArray(normalizedRow.subcategoryids) ??
+        this.toOptionalStringArray(normalizedRow.categoryids),
     };
   }
 

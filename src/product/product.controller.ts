@@ -15,7 +15,10 @@ import {
   BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -47,7 +50,10 @@ export class ProductController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  async list(@Query() query: ListProductsQueryDto, @Req() req: any): Promise<{
+  async list(
+    @Query() query: ListProductsQueryDto,
+    @Req() req: any,
+  ): Promise<{
     items: unknown[];
     total: number;
     page: number;
@@ -64,7 +70,10 @@ export class ProductController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
-  async getBySlug(@Param('slug') slug: string, @Req() req: any): Promise<unknown> {
+  async getBySlug(
+    @Param('slug') slug: string,
+    @Req() req: any,
+  ): Promise<unknown> {
     return this.productService.getProductBySlug(slug, req.user?.role);
   }
 
@@ -90,8 +99,12 @@ export class ProductController {
       storage: memoryStorage(),
       limits: { fileSize: MAX_SPREADSHEET_SIZE_BYTES },
       fileFilter: (_req, file, cb) => {
-        const hasXlsxExtension = file.originalname.toLowerCase().endsWith('.xlsx');
-        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(file.mimetype);
+        const hasXlsxExtension = file.originalname
+          .toLowerCase()
+          .endsWith('.xlsx');
+        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
+          file.mimetype,
+        );
         const isGenericBinaryXlsx =
           file.mimetype === 'application/octet-stream' && hasXlsxExtension;
 
@@ -150,19 +163,19 @@ export class ProductController {
         { name: 'images[]', maxCount: 3 },
       ],
       {
-      storage: memoryStorage(), // keep file in memory (buffer) so we can stream to S3
-      limits: { fileSize: MAX_SIZE_BYTES },
-      fileFilter: (_req, file, cb) => {
-        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-          return cb(
-            new BadRequestException(
-              `Unsupported file type "${file.mimetype}". Allowed: jpeg, png, webp`,
-            ),
-            false,
-          );
-        }
-        cb(null, true);
-      },
+        storage: memoryStorage(), // keep file in memory (buffer) so we can stream to S3
+        limits: { fileSize: MAX_SIZE_BYTES },
+        fileFilter: (_req, file, cb) => {
+          if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+            return cb(
+              new BadRequestException(
+                `Unsupported file type "${file.mimetype}". Allowed: jpeg, png, webp`,
+              ),
+              false,
+            );
+          }
+          cb(null, true);
+        },
       },
     ),
   )
@@ -207,6 +220,16 @@ export class ProductController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Post(':id/subcategories')
+  async linkSubcategories(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Body() dto: LinkProductCategoriesDto,
+  ): Promise<{ added: number; skipped: string[]; invalid: string[] }> {
+    return this.productService.linkCategories(productId, dto.categoryIds);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Delete(':id/categories/:catId')
   async unlinkCategory(
     @Param('id', ParseUUIDPipe) productId: string,
@@ -217,10 +240,18 @@ export class ProductController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
-  @Get(':id/tags')
-  async getLinkedTags(
+  @Delete(':id/subcategories/:subCategoryId')
+  async unlinkSubcategory(
     @Param('id', ParseUUIDPipe) productId: string,
-  ): Promise<
+    @Param('subCategoryId', ParseUUIDPipe) subCategoryId: string,
+  ): Promise<{ message: string }> {
+    return this.productService.unlinkCategory(productId, subCategoryId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Get(':id/tags')
+  async getLinkedTags(@Param('id', ParseUUIDPipe) productId: string): Promise<
     Array<{
       id: string;
       name: string;
