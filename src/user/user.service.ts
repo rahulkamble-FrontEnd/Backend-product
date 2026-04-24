@@ -185,10 +185,7 @@ export class UserService {
       throw new NotFoundException(`Customer with ID '${customerId}' not found`);
     }
 
-    if (
-      !skipOwnershipCheck &&
-      customer.assignedDesigner?.id !== designerId
-    ) {
+    if (!skipOwnershipCheck && customer.assignedDesigner?.id !== designerId) {
       throw new ForbiddenException('This customer is not assigned to you');
     }
 
@@ -366,12 +363,7 @@ export class UserService {
   async updateSampleStatus(
     shortlistId: string,
     designerId: string,
-    sampleStatus:
-      | 'none'
-      | 'pending'
-      | 'ready'
-      | 'collected'
-      | 'not available',
+    sampleStatus: 'none' | 'pending' | 'ready' | 'collected' | 'not available',
     isAdmin = false,
   ): Promise<Shortlist> {
     const shortlist = await this.shortlistRepository.findOne({

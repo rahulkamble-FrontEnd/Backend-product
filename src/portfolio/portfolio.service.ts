@@ -39,14 +39,14 @@ export class PortfolioService {
         category: entry.category,
         createdAt: entry.createdAt,
         images: await Promise.all(
-          [...(entry.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder).map(
-            async (img) => ({
+          [...(entry.images ?? [])]
+            .sort((a, b) => a.displayOrder - b.displayOrder)
+            .map(async (img) => ({
               id: img.id,
               s3Key: img.s3Key,
               url: await this.s3Service.getSignedObjectUrl(img.s3Key),
               displayOrder: img.displayOrder,
-            }),
-          ),
+            })),
         ),
       })),
     );
@@ -101,9 +101,7 @@ export class PortfolioService {
     const images = [...manualImages, ...uploadedImageRecords];
 
     const savedImages =
-      images.length > 0
-        ? await this.portfolioImageRepository.save(images)
-        : [];
+      images.length > 0 ? await this.portfolioImageRepository.save(images) : [];
 
     return {
       portfolio: savedPortfolio,

@@ -52,7 +52,7 @@ async function bootstrap() {
     },
     credentials: true,
   });
-  
+
   /**
    * 4. COOKIE PARSER
    * This middleware allows NestJS to read cookies from incoming requests.

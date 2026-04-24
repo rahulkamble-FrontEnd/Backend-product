@@ -20,7 +20,12 @@ export class BlogPost {
   @Column({ type: 'varchar', length: 270, unique: true, nullable: false })
   slug: string;
 
-  @Column({ name: 'category_tag', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'category_tag',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   categoryTag: string | null;
 
   @Column({
