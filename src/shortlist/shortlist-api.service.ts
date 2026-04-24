@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Shortlist } from './shortlist.entity';
@@ -38,7 +42,10 @@ export class ShortlistApiService {
     private readonly designerRecommendationsRepository: Repository<DesignerRecommendation>,
   ) {}
 
-  async create(customerId: string, dto: AddShortlistItemDto): Promise<Shortlist> {
+  async create(
+    customerId: string,
+    dto: AddShortlistItemDto,
+  ): Promise<Shortlist> {
     const product = await this.productRepository.findOne({
       where: { id: dto.productId },
     });
@@ -155,7 +162,8 @@ export class ShortlistApiService {
     }, {});
 
     return shortlistItems.map((shortlist) => {
-      const latestDesignerNote = latestNoteByProduct.get(shortlist.productId) ?? null;
+      const latestDesignerNote =
+        latestNoteByProduct.get(shortlist.productId) ?? null;
 
       return {
         ...shortlist,

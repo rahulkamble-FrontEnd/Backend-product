@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
@@ -54,6 +58,30 @@ export class CategoryService {
     });
   }
 
+  async findSubcategories(parentId: string): Promise<Category[]> {
+    const parent = await this.categoryRepository.findOne({
+      where: { id: parentId, isActive: true },
+      relations: ['parent'],
+    });
+    if (!parent) {
+      throw new NotFoundException(`Category with ID '${parentId}' not found`);
+    }
+    if (parent.parent) {
+      throw new BadRequestException(
+        `Category with ID '${parentId}' is already a sub-category`,
+      );
+    }
+
+    return this.categoryRepository.find({
+      where: {
+        parent: { id: parentId },
+        isActive: true,
+      },
+      relations: ['parent'],
+      order: { displayOrder: 'ASC', name: 'ASC' },
+    });
+  }
+
   async findMenu(
     type?: string,
     productLimit = 8,
@@ -98,7 +126,9 @@ export class CategoryService {
     const rows = await this.productCategoryRepository
       .createQueryBuilder('productCategory')
       .leftJoinAndSelect('productCategory.product', 'product')
-      .where('productCategory.category_id IN (:...categoryIds)', { categoryIds })
+      .where('productCategory.category_id IN (:...categoryIds)', {
+        categoryIds,
+      })
       .andWhere('product.status = :activeStatus', { activeStatus: 'active' })
       .andWhere('product.deleted_at IS NULL')
       .orderBy('product.created_at', 'DESC')
@@ -190,13 +220,24 @@ export class CategoryService {
   async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
     const { name, type, parent_id } = createCategoryDto;
 
-    // Create unique slug from name
-    const slug = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    const slug = await this.generateUniqueSlug(name);
+
+    if (parent_id) {
+      const parent = await this.categoryRepository.findOne({
+        where: { id: parent_id, isActive: true },
+        relations: ['parent'],
+      });
+      if (!parent) {
+        throw new NotFoundException(
+          `Parent category with ID '${parent_id}' not found`,
+        );
+      }
+      if (parent.parent) {
+        throw new BadRequestException(
+          'Only one sub-category level is allowed. Parent must be a top-level category.',
+        );
+      }
+    }
 
     const newCategory = this.categoryRepository.create({
       name,
@@ -214,20 +255,68 @@ export class CategoryService {
 
     if (name) {
       updateData.name = name;
-      updateData.slug = name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      updateData.slug = await this.generateUniqueSlug(name, id);
     }
 
     if (type) updateData.type = type;
-    if (parent_id !== undefined)
+    if (parent_id !== undefined) {
+      if (parent_id === id) {
+        throw new BadRequestException('Category cannot be parent of itself');
+      }
+      if (parent_id) {
+        const parent = await this.categoryRepository.findOne({
+          where: { id: parent_id, isActive: true },
+          relations: ['parent'],
+        });
+        if (!parent) {
+          throw new NotFoundException(
+            `Parent category with ID '${parent_id}' not found`,
+          );
+        }
+        if (parent.parent) {
+          throw new BadRequestException(
+            'Only one sub-category level is allowed. Parent must be a top-level category.',
+          );
+        }
+      }
       updateData.parent = parent_id ? { id: parent_id } : null;
+    }
 
     await this.categoryRepository.update(id, updateData);
     return this.findOne(id);
+  }
+
+  async createSubcategory(
+    categoryId: string,
+    createCategoryDto: CreateCategoryDto,
+  ): Promise<Category> {
+    return this.create({
+      ...createCategoryDto,
+      parent_id: categoryId,
+    });
+  }
+
+  async updateSubcategory(
+    categoryId: string,
+    subCategoryId: string,
+    updateCategoryDto: any,
+  ): Promise<Category | null> {
+    const subCategory = await this.categoryRepository.findOne({
+      where: { id: subCategoryId, isActive: true },
+      relations: ['parent'],
+    });
+    if (!subCategory) {
+      throw new NotFoundException(
+        `Sub-category with ID '${subCategoryId}' not found`,
+      );
+    }
+    if (!subCategory.parent || subCategory.parent.id !== categoryId) {
+      throw new BadRequestException(
+        `Sub-category '${subCategoryId}' is not linked to category '${categoryId}'`,
+      );
+    }
+
+    return this.update(subCategoryId, updateCategoryDto);
   }
 
   async deactivate(id: string): Promise<{ message: string }> {
@@ -238,5 +327,72 @@ export class CategoryService {
     category.isActive = false;
     await this.categoryRepository.save(category);
     return { message: `Category with ID '${id}' has been deactivated` };
+  }
+
+  async deactivateSubcategory(
+    categoryId: string,
+    subCategoryId: string,
+  ): Promise<{ message: string }> {
+    const subCategory = await this.categoryRepository.findOne({
+      where: { id: subCategoryId, isActive: true },
+      relations: ['parent'],
+    });
+    if (!subCategory) {
+      throw new NotFoundException(
+        `Sub-category with ID '${subCategoryId}' not found`,
+      );
+    }
+    if (!subCategory.parent || subCategory.parent.id !== categoryId) {
+      throw new BadRequestException(
+        `Sub-category '${subCategoryId}' is not linked to category '${categoryId}'`,
+      );
+    }
+
+    return this.deactivate(subCategoryId);
+  }
+
+  private slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  private async generateUniqueSlug(
+    name: string,
+    excludingCategoryId?: string,
+  ): Promise<string> {
+    const baseSlug = this.slugify(name);
+    if (!baseSlug) {
+      throw new BadRequestException('Category name results in an empty slug');
+    }
+
+    const existing = await this.categoryRepository.find({
+      where: { slug: baseSlug },
+      select: ['id', 'slug'],
+    });
+    const hasConflict = existing.some((row) => row.id !== excludingCategoryId);
+    if (!hasConflict) {
+      return baseSlug;
+    }
+
+    let counter = 2;
+    while (counter <= 9999) {
+      const candidate = `${baseSlug}-${counter}`;
+      const match = await this.categoryRepository.findOne({
+        where: { slug: candidate },
+        select: ['id'],
+      });
+      if (!match || match.id === excludingCategoryId) {
+        return candidate;
+      }
+      counter += 1;
+    }
+
+    throw new BadRequestException(
+      'Unable to generate unique slug for category',
+    );
   }
 }

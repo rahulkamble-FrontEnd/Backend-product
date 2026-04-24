@@ -46,7 +46,6 @@ import { TagsModule } from './tags/tags.module';
           // Keep connections stable across idle/network blips.
           connectionLimit: 10,
           connectTimeout: 30000,
-          acquireTimeout: 30000,
           enableKeepAlive: true,
           keepAliveInitialDelay: 10000,
         },

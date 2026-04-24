@@ -88,7 +88,10 @@ export class S3Service {
   /**
    * Returns a time-limited signed URL for private bucket object access.
    */
-  async getSignedObjectUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+  async getSignedObjectUrl(
+    key: string,
+    expiresInSeconds = 3600,
+  ): Promise<string> {
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucket,
