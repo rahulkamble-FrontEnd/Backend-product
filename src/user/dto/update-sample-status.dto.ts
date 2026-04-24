@@ -4,10 +4,5 @@ export class UpdateSampleStatusDto {
   @IsString()
   @IsNotEmpty()
   @IsIn(['none', 'pending', 'ready', 'collected', 'not available'])
-  sampleStatus:
-    | 'none'
-    | 'pending'
-    | 'ready'
-    | 'collected'
-    | 'not available';
+  sampleStatus: 'none' | 'pending' | 'ready' | 'collected' | 'not available';
 }

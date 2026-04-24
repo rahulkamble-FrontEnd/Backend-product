@@ -41,12 +41,12 @@ import { TagsModule } from './tags/tags.module';
         keepConnectionAlive: true,
         retryAttempts: 10,
         retryDelay: 3000,
-        synchronize: true, // DO NOT use this in production; it can cause data loss!
+        // Safe default for production; enable only when explicitly set.
+        synchronize: config.get<string>('DB_SYNCHRONIZE') === 'true',
         extra: {
           // Keep connections stable across idle/network blips.
           connectionLimit: 10,
           connectTimeout: 30000,
-          acquireTimeout: 30000,
           enableKeepAlive: true,
           keepAliveInitialDelay: 10000,
         },

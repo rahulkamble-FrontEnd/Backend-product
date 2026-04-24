@@ -64,10 +64,7 @@ export class DesignerController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.DESIGNER, UserRole.ADMIN)
   @Post('notes')
-  async addNote(
-    @Body() dto: CreateDesignerNoteDto,
-    @Request() req,
-  ) {
+  async addNote(@Body() dto: CreateDesignerNoteDto, @Request() req) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;
     const effectiveDesignerId = req.user?.id;

@@ -91,7 +91,9 @@ export class BlogService {
   }
 
   async publish(postId: string, dto: PublishBlogPostDto): Promise<BlogPost> {
-    const post = await this.blogPostRepository.findOne({ where: { id: postId } });
+    const post = await this.blogPostRepository.findOne({
+      where: { id: postId },
+    });
     if (!post) {
       throw new NotFoundException(`Blog post with id "${postId}" not found`);
     }
@@ -102,7 +104,9 @@ export class BlogService {
   }
 
   async update(postId: string, dto: UpdateBlogPostDto): Promise<BlogPost> {
-    const post = await this.blogPostRepository.findOne({ where: { id: postId } });
+    const post = await this.blogPostRepository.findOne({
+      where: { id: postId },
+    });
     if (!post) {
       throw new NotFoundException(`Blog post with id "${postId}" not found`);
     }
@@ -127,14 +131,16 @@ export class BlogService {
     if (dto.status !== undefined) {
       post.status = dto.status;
       post.publishedAt =
-        dto.status === 'published' ? post.publishedAt ?? new Date() : null;
+        dto.status === 'published' ? (post.publishedAt ?? new Date()) : null;
     }
 
     return this.blogPostRepository.save(post);
   }
 
   async togglePublished(postId: string): Promise<BlogPost> {
-    const post = await this.blogPostRepository.findOne({ where: { id: postId } });
+    const post = await this.blogPostRepository.findOne({
+      where: { id: postId },
+    });
     if (!post) {
       throw new NotFoundException(`Blog post with id "${postId}" not found`);
     }
@@ -151,7 +157,9 @@ export class BlogService {
   }
 
   async remove(postId: string): Promise<{ message: string }> {
-    const post = await this.blogPostRepository.findOne({ where: { id: postId } });
+    const post = await this.blogPostRepository.findOne({
+      where: { id: postId },
+    });
     if (!post) {
       throw new NotFoundException(`Blog post with id "${postId}" not found`);
     }
@@ -160,7 +168,10 @@ export class BlogService {
     return { message: `Blog post "${postId}" deleted successfully` };
   }
 
-  async createPortfolio(dto: CreatePortfolioDto, userId: string): Promise<{
+  async createPortfolio(
+    dto: CreatePortfolioDto,
+    userId: string,
+  ): Promise<{
     portfolio: Portfolio;
     images: PortfolioImage[];
   }> {
@@ -181,9 +192,7 @@ export class BlogService {
     );
 
     const savedImages =
-      images.length > 0
-        ? await this.portfolioImageRepository.save(images)
-        : [];
+      images.length > 0 ? await this.portfolioImageRepository.save(images) : [];
 
     return {
       portfolio: savedPortfolio,
@@ -191,7 +200,10 @@ export class BlogService {
     };
   }
 
-  async createTrending(dto: CreateTrendingDto, userId: string): Promise<Trending> {
+  async createTrending(
+    dto: CreateTrendingDto,
+    userId: string,
+  ): Promise<Trending> {
     const entity = this.trendingRepository.create({
       title: dto.title,
       styleTag: dto.styleTag ?? null,

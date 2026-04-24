@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   Req,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { Category } from './category.entity';
@@ -52,6 +53,13 @@ export class CategoryController {
     );
   }
 
+  @Get(':id/subcategories')
+  async findSubcategories(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Category[]> {
+    return this.categoryService.findSubcategories(id);
+  }
+
   @Get(':slug')
   async findBySlug(@Param('slug') slug: string): Promise<Category | null> {
     return this.categoryService.findBySlug(slug);
@@ -68,6 +76,19 @@ export class CategoryController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Post(':id/subcategories')
+  async createSubcategory(
+    @Param('id', ParseUUIDPipe) categoryId: string,
+    @Body() createCategoryDto: CreateCategoryDto,
+  ): Promise<Category> {
+    return this.categoryService.createSubcategory(
+      categoryId,
+      createCategoryDto,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -78,8 +99,36 @@ export class CategoryController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Put(':categoryId/subcategories/:subCategoryId')
+  async updateSubcategory(
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
+    @Param('subCategoryId', ParseUUIDPipe) subCategoryId: string,
+    @Body() updateCategoryDto: UpdateCategoryDto,
+  ): Promise<Category | null> {
+    return this.categoryService.updateSubcategory(
+      categoryId,
+      subCategoryId,
+      updateCategoryDto,
+    );
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     return this.categoryService.deactivate(id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(':categoryId/subcategories/:subCategoryId')
+  async removeSubcategory(
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
+    @Param('subCategoryId', ParseUUIDPipe) subCategoryId: string,
+  ): Promise<{ message: string }> {
+    return this.categoryService.deactivateSubcategory(
+      categoryId,
+      subCategoryId,
+    );
   }
 }

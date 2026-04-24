@@ -61,12 +61,20 @@ export class PortfolioController {
     @Body() dto: CreatePortfolioEntryDto,
     @Req() req: any,
     @UploadedFiles()
-    files?: { images?: Express.Multer.File[]; 'images[]'?: Express.Multer.File[] },
+    files?: {
+      images?: Express.Multer.File[];
+      'images[]'?: Express.Multer.File[];
+    },
   ) {
-    const uploadedFiles = [...(files?.images ?? []), ...(files?.['images[]'] ?? [])];
+    const uploadedFiles = [
+      ...(files?.images ?? []),
+      ...(files?.['images[]'] ?? []),
+    ];
     const emptyFile = uploadedFiles.find((file) => file.size === 0);
     if (emptyFile) {
-      throw new BadRequestException(`Uploaded image "${emptyFile.originalname}" is empty`);
+      throw new BadRequestException(
+        `Uploaded image "${emptyFile.originalname}" is empty`,
+      );
     }
     return this.portfolioService.createEntry(dto, req.user.id, uploadedFiles);
   }

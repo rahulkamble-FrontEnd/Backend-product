@@ -17,7 +17,10 @@ export class NotificationService {
     });
   }
 
-  async markOneAsRead(notificationId: string, userId: string): Promise<Notification> {
+  async markOneAsRead(
+    notificationId: string,
+    userId: string,
+  ): Promise<Notification> {
     const notification = await this.notificationRepository.findOne({
       where: { id: notificationId, userId },
     });
