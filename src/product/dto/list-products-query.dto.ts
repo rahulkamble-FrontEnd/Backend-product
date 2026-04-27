@@ -36,6 +36,10 @@ export class ListProductsQueryDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsString()
+  categorySlug?: string;
+
+  @IsOptional()
   @IsIn(['material', 'furniture'])
   categoryType?: string;
 

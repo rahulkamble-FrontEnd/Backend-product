@@ -17,6 +17,7 @@ import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { Trending } from '../trending/trending.entity';
 import { CreateTrendingDto } from './dto/create-trending.dto';
 import { S3Service } from '../common/services/s3.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class BlogService {
@@ -84,7 +85,7 @@ export class BlogService {
       featuredImageS3Key,
       status: dto.status ?? 'draft',
       publishedAt: dto.status === 'published' ? new Date() : null,
-      author: { id: userId } as any,
+      author: { id: userId } as User,
     });
 
     return this.blogPostRepository.save(entity);
@@ -179,7 +180,7 @@ export class BlogService {
       title: dto.title,
       roomType: dto.roomType ?? null,
       description: dto.description ?? null,
-      createdBy: { id: userId } as any,
+      createdBy: { id: userId } as User,
     });
     const savedPortfolio = await this.portfolioRepository.save(portfolio);
 
@@ -209,7 +210,7 @@ export class BlogService {
       styleTag: dto.styleTag ?? null,
       s3Key: dto.s3Key,
       caption: dto.caption ?? null,
-      createdBy: { id: userId } as any,
+      createdBy: { id: userId } as User,
     });
 
     return this.trendingRepository.save(entity);

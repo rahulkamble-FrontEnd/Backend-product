@@ -18,6 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioEntryDto } from './dto/create-portfolio-entry.dto';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB per image
@@ -59,7 +60,7 @@ export class PortfolioController {
   )
   async create(
     @Body() dto: CreatePortfolioEntryDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @UploadedFiles()
     files?: {
       images?: Express.Multer.File[];

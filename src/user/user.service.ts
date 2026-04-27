@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { FindOptionsWhere } from 'typeorm';
 import { User } from './user.entity';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
@@ -25,6 +26,14 @@ export class UserService {
     @InjectRepository(Shortlist)
     private shortlistRepository: Repository<Shortlist>,
   ) {}
+
+  private sanitizeUser(user: User): User {
+    const sanitizedUser: Partial<User> = { ...user };
+    delete sanitizedUser.passwordHash;
+    delete sanitizedUser.resetPasswordToken;
+    delete sanitizedUser.resetPasswordExpires;
+    return sanitizedUser as User;
+  }
 
   /**
    * Create a new user (called by Admin)
@@ -57,8 +66,7 @@ export class UserService {
     const savedUser = await this.usersRepository.save(newUser);
 
     // Remove sensitive data before returning
-    const { passwordHash: _, ...userWithoutPassword } = savedUser;
-    return userWithoutPassword as User;
+    return this.sanitizeUser(savedUser);
   }
 
   /**
@@ -101,8 +109,7 @@ export class UserService {
 
     // 3. Save and return clean user object
     const savedUser = await this.usersRepository.save(user);
-    const { passwordHash, ...result } = savedUser;
-    return result as User;
+    return this.sanitizeUser(savedUser);
   }
 
   /**
@@ -122,7 +129,7 @@ export class UserService {
    * Find all users, optionally filtered by role
    */
   async findAll(role?: string): Promise<User[]> {
-    const where: any = {};
+    const where: FindOptionsWhere<User> = {};
     if (role) {
       where.role = role;
     }
@@ -131,35 +138,19 @@ export class UserService {
       relations: ['assignedDesigner'],
     });
     // Remove sensitive data from all returned users
-    return users.map((user) => {
-      const {
-        passwordHash,
-        resetPasswordToken,
-        resetPasswordExpires,
-        ...result
-      } = user;
-      return result as User;
-    });
+    return users.map((user) => this.sanitizeUser(user));
   }
 
   async findAssignedCustomers(designerId: string): Promise<User[]> {
     const customers = await this.usersRepository.find({
       where: {
         role: UserRole.CUSTOMER,
-        assignedDesigner: { id: designerId } as any,
+        assignedDesigner: { id: designerId } as User,
       },
       relations: ['assignedDesigner'],
     });
 
-    return customers.map((user) => {
-      const {
-        passwordHash,
-        resetPasswordToken,
-        resetPasswordExpires,
-        ...result
-      } = user;
-      return result as User;
-    });
+    return customers.map((user) => this.sanitizeUser(user));
   }
 
   async getCustomerShortlistAndNotes(
@@ -234,15 +225,8 @@ export class UserService {
       recommendations: recommendationsByProductId[item.productId] ?? [],
     }));
 
-    const {
-      passwordHash,
-      resetPasswordToken,
-      resetPasswordExpires,
-      ...customerWithoutSensitiveFields
-    } = customer;
-
     return {
-      customer: customerWithoutSensitiveFields as User,
+      customer: this.sanitizeUser(customer),
       shortlist: shortlistWithRecommendations,
       notes,
       recommendations,

@@ -26,6 +26,7 @@ import { PublishBlogPostDto } from './dto/publish-blog-post.dto';
 import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { CreateTrendingDto } from './dto/create-trending.dto';
 import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -66,7 +67,7 @@ export class BlogController {
   )
   async createPost(
     @Body() dto: CreateBlogPostDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @UploadedFile() featuredImage?: Express.Multer.File,
   ) {
     if (featuredImage && featuredImage.size === 0) {
@@ -112,14 +113,20 @@ export class BlogController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Post('portfolio')
-  async createPortfolio(@Body() dto: CreatePortfolioDto, @Req() req: any) {
+  async createPortfolio(
+    @Body() dto: CreatePortfolioDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.blogService.createPortfolio(dto, req.user.id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Post('trending')
-  async createTrending(@Body() dto: CreateTrendingDto, @Req() req: any) {
+  async createTrending(
+    @Body() dto: CreateTrendingDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.blogService.createTrending(dto, req.user.id);
   }
 }
