@@ -21,6 +21,7 @@ import {
   ShortlistApiService,
   ShortlistListItem,
 } from './shortlist-api.service';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 @Controller('shortlist')
 export class ShortlistApiController {
@@ -31,7 +32,7 @@ export class ShortlistApiController {
   @Post()
   async create(
     @Body() dto: AddShortlistItemDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Shortlist> {
     return this.shortlistApiService.create(req.user.id, dto);
   }
@@ -41,7 +42,7 @@ export class ShortlistApiController {
   @Post(':id/sample')
   async requestSample(
     @Param('id', ParseUUIDPipe) shortlistId: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Shortlist> {
     return this.shortlistApiService.requestSample(shortlistId, req.user.id);
   }
@@ -49,7 +50,9 @@ export class ShortlistApiController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @Get()
-  async list(@Request() req): Promise<ShortlistListItem[]> {
+  async list(
+    @Request() req: AuthenticatedRequest,
+  ): Promise<ShortlistListItem[]> {
     return this.shortlistApiService.list(req.user.id);
   }
 
@@ -59,7 +62,7 @@ export class ShortlistApiController {
   async updateNote(
     @Param('id', ParseUUIDPipe) shortlistId: string,
     @Body() dto: UpdateShortlistNoteDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Shortlist> {
     return this.shortlistApiService.updateNote(
       shortlistId,
@@ -73,7 +76,7 @@ export class ShortlistApiController {
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) shortlistId: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     return this.shortlistApiService.remove(shortlistId, req.user.id);
   }

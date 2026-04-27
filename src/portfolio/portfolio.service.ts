@@ -7,6 +7,7 @@ import { Portfolio } from './portfolio.entity';
 import { PortfolioImage } from './portfolio-image.entity';
 import { CreatePortfolioEntryDto } from './dto/create-portfolio-entry.dto';
 import { S3Service } from '../common/services/s3.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class PortfolioService {
@@ -62,7 +63,7 @@ export class PortfolioService {
       roomType: dto.roomType ?? null,
       description: dto.description ?? null,
       category: dto.category?.trim() ? dto.category.trim() : null,
-      createdBy: { id: userId } as any,
+      createdBy: { id: userId } as User,
     });
     const savedPortfolio = await this.portfolioRepository.save(portfolio);
 

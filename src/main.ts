@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import type { RequestHandler } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -42,14 +44,14 @@ async function bootstrap() {
   ];
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: ((origin, callback) => {
       // Allow non-browser requests (curl/postman) and configured browser origins.
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
       }
       callback(new Error(`CORS blocked for origin: ${origin}`), false);
-    },
+    }) as CorsOptions['origin'],
     credentials: true,
   });
 
@@ -57,10 +59,12 @@ async function bootstrap() {
    * 4. COOKIE PARSER
    * This middleware allows NestJS to read cookies from incoming requests.
    */
-  app.use(cookieParser());
+  const createCookieParser = cookieParser as unknown as () => RequestHandler;
+  const cookieParserMiddleware = createCookieParser();
+  app.use(cookieParserMiddleware);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://localhost:${port}/api`);
 }
-bootstrap();
+void bootstrap();

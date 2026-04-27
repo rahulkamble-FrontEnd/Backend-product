@@ -10,6 +10,7 @@ import { extname } from 'path';
 import { Trending } from './trending.entity';
 import { CreateTrendingEntryDto } from './dto/create-trending-entry.dto';
 import { S3Service } from '../common/services/s3.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class TrendingService {
@@ -64,7 +65,7 @@ export class TrendingService {
       styleTag: dto.styleTag ?? null,
       s3Key,
       caption: dto.caption ?? null,
-      createdBy: { id: userId } as any,
+      createdBy: { id: userId } as User,
     });
 
     return this.trendingRepository.save(entity);

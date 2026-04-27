@@ -5,11 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { FindOptionsWhere } from 'typeorm';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { ProductCategory } from '../product/product-category.entity';
 import { Product } from '../product/product.entity';
 import { UserRole } from '../user/dto/create-user.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 export interface CategoryMenuProduct {
   id: string;
@@ -40,7 +42,7 @@ export class CategoryService {
   ) {}
 
   async findAll(type?: string): Promise<Category[]> {
-    const where: any = { isActive: true };
+    const where: FindOptionsWhere<Category> = { isActive: true };
     if (type) {
       where.type = type;
     }
@@ -249,9 +251,12 @@ export class CategoryService {
     return this.categoryRepository.save(newCategory);
   }
 
-  async update(id: string, updateCategoryDto: any): Promise<Category | null> {
+  async update(
+    id: string,
+    updateCategoryDto: UpdateCategoryDto,
+  ): Promise<Category | null> {
     const { name, type, parent_id } = updateCategoryDto;
-    const updateData: any = {};
+    const updateData: Partial<Category> = {};
 
     if (name) {
       updateData.name = name;
@@ -279,7 +284,7 @@ export class CategoryService {
           );
         }
       }
-      updateData.parent = parent_id ? { id: parent_id } : null;
+      updateData.parent = parent_id ? ({ id: parent_id } as Category) : null;
     }
 
     await this.categoryRepository.update(id, updateData);
@@ -299,7 +304,7 @@ export class CategoryService {
   async updateSubcategory(
     categoryId: string,
     subCategoryId: string,
-    updateCategoryDto: any,
+    updateCategoryDto: UpdateCategoryDto,
   ): Promise<Category | null> {
     const subCategory = await this.categoryRepository.findOne({
       where: { id: subCategoryId, isActive: true },

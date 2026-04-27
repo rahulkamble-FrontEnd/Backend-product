@@ -14,6 +14,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import type { AuthenticatedRequest } from './types/auth-user.type';
 
 @Controller('auth')
 export class AuthController {
@@ -50,7 +51,7 @@ export class AuthController {
     }
 
     // Create the token
-    const { access_token } = await this.authService.login(user);
+    const { access_token } = this.authService.login(user);
 
     // Set JWT cookie with cross-site compatible settings in production.
     response.cookie('jwt', access_token, this.getJwtCookieOptions());
@@ -63,7 +64,7 @@ export class AuthController {
    * Clears the JWT cookie
    */
   @Post('logout')
-  async logout(@Res({ passthrough: true }) response: Response) {
+  logout(@Res({ passthrough: true }) response: Response) {
     response.clearCookie('jwt', this.getJwtCookieOptions());
     return { message: 'Logout successful' };
   }
@@ -74,7 +75,7 @@ export class AuthController {
    */
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  getProfile(@Request() req) {
+  getProfile(@Request() req: AuthenticatedRequest) {
     return req.user;
   }
 
@@ -84,7 +85,7 @@ export class AuthController {
    */
   @UseGuards(AuthGuard('jwt'))
   @Get('me')
-  getMe(@Request() req) {
+  getMe(@Request() req: AuthenticatedRequest) {
     const { id, name, role } = req.user;
     return { id, name, role };
   }
