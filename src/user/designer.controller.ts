@@ -20,6 +20,7 @@ import { CreateDesignerNoteDto } from './dto/create-designer-note.dto';
 import { CreateDesignerRecommendationDto } from './dto/create-designer-recommendation.dto';
 import { UpdateDesignerNoteDto } from './dto/update-designer-note.dto';
 import { UpdateSampleStatusDto } from './dto/update-sample-status.dto';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 @Controller('designer')
 export class DesignerController {
@@ -29,7 +30,7 @@ export class DesignerController {
   @Roles(UserRole.DESIGNER, UserRole.ADMIN)
   @Get('customers')
   async listAssignedCustomers(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Query('designerId') designerId?: string,
   ) {
     const role = req.user?.role;
@@ -48,7 +49,7 @@ export class DesignerController {
   @Get('customers/:id')
   async getCustomerShortlistAndNotes(
     @Param('id', ParseUUIDPipe) customerId: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;
@@ -64,7 +65,10 @@ export class DesignerController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.DESIGNER, UserRole.ADMIN)
   @Post('notes')
-  async addNote(@Body() dto: CreateDesignerNoteDto, @Request() req) {
+  async addNote(
+    @Body() dto: CreateDesignerNoteDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;
     const effectiveDesignerId = req.user?.id;
@@ -84,7 +88,7 @@ export class DesignerController {
   async updateNote(
     @Param('id', ParseUUIDPipe) noteId: string,
     @Body() dto: UpdateDesignerNoteDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;
@@ -105,7 +109,7 @@ export class DesignerController {
   async updateSampleStatus(
     @Param('shortlistId', ParseUUIDPipe) shortlistId: string,
     @Body() dto: UpdateSampleStatusDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;
@@ -124,7 +128,7 @@ export class DesignerController {
   @Post('recommendations')
   async recommendProduct(
     @Body() dto: CreateDesignerRecommendationDto,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
   ) {
     const role = req.user?.role;
     const isAdmin = role === UserRole.ADMIN;

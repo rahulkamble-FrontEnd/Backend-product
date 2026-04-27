@@ -9,15 +9,12 @@ import {
   Req,
   Param,
   Query,
-  UploadedFile,
   UploadedFiles,
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import {
-  FileFieldsInterceptor,
-} from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -34,6 +31,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { LinkProductTagDto } from './dto/link-product-tag.dto';
+import type {
+  AuthenticatedRequest,
+  OptionalAuthenticatedRequest,
+} from '../auth/types/auth-user.type';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -57,7 +58,7 @@ export class ProductController {
   @Get()
   async list(
     @Query() query: ListProductsQueryDto,
-    @Req() req: any,
+    @Req() req: OptionalAuthenticatedRequest,
   ): Promise<{
     items: unknown[];
     total: number;
@@ -69,7 +70,10 @@ export class ProductController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('compare')
-  async compare(@Query('ids') ids: string, @Req() req: any): Promise<unknown> {
+  async compare(
+    @Query('ids') ids: string,
+    @Req() req: OptionalAuthenticatedRequest,
+  ): Promise<unknown> {
     return this.productService.compareProducts(ids, req.user?.role);
   }
 
@@ -77,7 +81,7 @@ export class ProductController {
   @Get(':slug')
   async getBySlug(
     @Param('slug') slug: string,
-    @Req() req: any,
+    @Req() req: OptionalAuthenticatedRequest,
   ): Promise<unknown> {
     return this.productService.getProductBySlug(slug, req.user?.role);
   }
@@ -91,7 +95,7 @@ export class ProductController {
   @Post()
   async create(
     @Body() createProductDto: CreateProductDto,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ): Promise<Product> {
     return this.productService.create(createProductDto, req.user);
   }
@@ -106,57 +110,57 @@ export class ProductController {
         { name: 'imagesZip', maxCount: 1 },
       ],
       {
-      storage: memoryStorage(),
-      limits: {
-        fileSize: MAX_ZIP_SIZE_BYTES,
-        files: 2,
-      },
-      fileFilter: (_req, file, cb) => {
-        const originalName = file.originalname.toLowerCase();
-        const isSpreadsheetField = file.fieldname === 'file';
-        const isZipField = file.fieldname === 'imagesZip';
+        storage: memoryStorage(),
+        limits: {
+          fileSize: MAX_ZIP_SIZE_BYTES,
+          files: 2,
+        },
+        fileFilter: (_req, file, cb) => {
+          const originalName = file.originalname.toLowerCase();
+          const isSpreadsheetField = file.fieldname === 'file';
+          const isZipField = file.fieldname === 'imagesZip';
 
-        if (isSpreadsheetField) {
-          const hasXlsxExtension = originalName.endsWith('.xlsx');
-          const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
-            file.mimetype,
+          if (isSpreadsheetField) {
+            const hasXlsxExtension = originalName.endsWith('.xlsx');
+            const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
+              file.mimetype,
+            );
+            const isGenericBinaryXlsx =
+              file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+            if (!allowedMimeType && !isGenericBinaryXlsx) {
+              return cb(
+                new BadRequestException(
+                  `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+                ),
+                false,
+              );
+            }
+            return cb(null, true);
+          }
+
+          if (isZipField) {
+            const hasZipExtension = originalName.endsWith('.zip');
+            const allowedMimeType =
+              ALLOWED_ZIP_MIME_TYPES.includes(file.mimetype) ||
+              file.mimetype === 'application/octet-stream';
+            if (!hasZipExtension || !allowedMimeType) {
+              return cb(
+                new BadRequestException(
+                  `Unsupported ZIP file type "${file.mimetype}". Upload a .zip file in "imagesZip".`,
+                ),
+                false,
+              );
+            }
+            return cb(null, true);
+          }
+
+          return cb(
+            new BadRequestException(
+              `Unsupported field "${file.fieldname}". Use "file" and optional "imagesZip".`,
+            ),
+            false,
           );
-          const isGenericBinaryXlsx =
-            file.mimetype === 'application/octet-stream' && hasXlsxExtension;
-          if (!allowedMimeType && !isGenericBinaryXlsx) {
-            return cb(
-              new BadRequestException(
-                `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
-              ),
-              false,
-            );
-          }
-          return cb(null, true);
-        }
-
-        if (isZipField) {
-          const hasZipExtension = originalName.endsWith('.zip');
-          const allowedMimeType =
-            ALLOWED_ZIP_MIME_TYPES.includes(file.mimetype) ||
-            file.mimetype === 'application/octet-stream';
-          if (!hasZipExtension || !allowedMimeType) {
-            return cb(
-              new BadRequestException(
-                `Unsupported ZIP file type "${file.mimetype}". Upload a .zip file in "imagesZip".`,
-              ),
-              false,
-            );
-          }
-          return cb(null, true);
-        }
-
-        return cb(
-          new BadRequestException(
-            `Unsupported field "${file.fieldname}". Use "file" and optional "imagesZip".`,
-          ),
-          false,
-        );
-      },
+        },
       },
     ),
   )
@@ -166,7 +170,7 @@ export class ProductController {
       file?: Express.Multer.File[];
       imagesZip?: Express.Multer.File[];
     },
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ): Promise<{
     totalRows: number;
     createdCount: number;

@@ -21,6 +21,7 @@ import * as XLSX from 'xlsx';
 import { UserRole } from '../user/dto/create-user.dto';
 import { ProductTag } from './product-tag.entity';
 import { Tag } from '../tags/tag.entity';
+import type { AuthUser } from '../auth/types/auth-user.type';
 
 @Injectable()
 export class ProductService {
@@ -42,7 +43,7 @@ export class ProductService {
 
   async create(
     createProductDto: CreateProductDto,
-    user: any,
+    user: AuthUser,
   ): Promise<Product> {
     const { categoryIds, ...productData } = createProductDto;
     const normalizedCategoryIds = Array.from(
@@ -99,7 +100,7 @@ export class ProductService {
       const newProduct = txProductRepository.create({
         ...productData,
         slug,
-        createdBy: { id: user.id } as any,
+        createdBy: { id: user.id },
       });
 
       const savedProduct = await txProductRepository.save(newProduct);
@@ -121,7 +122,7 @@ export class ProductService {
   async bulkCreateFromXlsx(
     file: Express.Multer.File,
     imagesZipFile: Express.Multer.File | undefined,
-    user: any,
+    user: AuthUser,
   ): Promise<{
     totalRows: number;
     createdCount: number;
@@ -163,7 +164,11 @@ export class ProductService {
       try {
         const dto = this.buildCreateProductDtoFromRow(rawRows[index]);
         const product = await this.create(dto, user);
-        await this.uploadBulkImagesFromZip(product.id, product.sku, zipImagesBySku);
+        await this.uploadBulkImagesFromZip(
+          product.id,
+          product.sku,
+          zipImagesBySku,
+        );
         created.push({
           row: excelRowNumber,
           id: product.id,
@@ -235,7 +240,10 @@ export class ProductService {
     }
 
     for (const list of imagesBySku.values()) {
-      list.sort((a, b) => a.sequence - b.sequence || a.fileName.localeCompare(b.fileName));
+      list.sort(
+        (a, b) =>
+          a.sequence - b.sequence || a.fileName.localeCompare(b.fileName),
+      );
     }
 
     return imagesBySku;
@@ -261,13 +269,18 @@ export class ProductService {
     if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
     if (ext === '.png') return 'image/png';
     if (ext === '.webp') return 'image/webp';
-    throw new BadRequestException(`Unsupported image extension in "${fileName}"`);
+    throw new BadRequestException(
+      `Unsupported image extension in "${fileName}"`,
+    );
   }
 
   private async uploadBulkImagesFromZip(
     productId: string,
     sku: string,
-    zipImagesBySku: Map<string, Array<{ sequence: number; fileName: string; file: Buffer }>>,
+    zipImagesBySku: Map<
+      string,
+      Array<{ sequence: number; fileName: string; file: Buffer }>
+    >,
   ): Promise<void> {
     const images = zipImagesBySku.get(sku);
     if (!images || images.length === 0) {
@@ -822,7 +835,11 @@ export class ProductService {
   ): Promise<ProductImage> {
     const fileExt = extname(originalName).toLowerCase();
     const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
-    const uploadedKey = await this.s3Service.uploadFile(s3Key, buffer, mimeType);
+    const uploadedKey = await this.s3Service.uploadFile(
+      s3Key,
+      buffer,
+      mimeType,
+    );
 
     if (dto.isPrimary) {
       await this.productImageRepository.update(
@@ -839,8 +856,10 @@ export class ProductService {
     });
 
     const savedImage = await this.productImageRepository.save(productImage);
-    (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
-    return savedImage;
+    return {
+      ...savedImage,
+      url: this.s3Service.getPublicUrl(uploadedKey),
+    } as ProductImage;
   }
 
   async linkCategories(
@@ -1088,7 +1107,7 @@ export class ProductService {
   }
 
   private toOptionalString(value: unknown): string | undefined {
-    if (value === null || value === undefined) {
+    if (!this.isStringifiablePrimitive(value)) {
       return undefined;
     }
     const text = String(value).trim();
@@ -1096,12 +1115,17 @@ export class ProductService {
   }
 
   private toOptionalNumber(value: unknown): number | undefined {
-    if (value === null || value === undefined || value === '') {
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      !this.isStringifiablePrimitive(value)
+    ) {
       return undefined;
     }
     const num = Number(value);
     if (Number.isNaN(num)) {
-      throw new BadRequestException(`Invalid number value "${String(value)}"`);
+      throw new BadRequestException('Invalid number value');
     }
     return num;
   }
@@ -1111,9 +1135,15 @@ export class ProductService {
       return undefined;
     }
     if (Array.isArray(value)) {
-      const arr = value.map((item) => String(item).trim()).filter(Boolean);
+      const arr = value
+        .map((item) => this.coerceArrayItemToString(item))
+        .filter((item): item is string => Boolean(item));
       return arr.length > 0 ? arr : undefined;
     }
+    if (!this.isStringifiablePrimitive(value)) {
+      return undefined;
+    }
+
     const str = String(value).trim();
     if (!str) {
       return undefined;
@@ -1121,9 +1151,11 @@ export class ProductService {
 
     if (str.startsWith('[') && str.endsWith(']')) {
       try {
-        const parsed = JSON.parse(str);
+        const parsed: unknown = JSON.parse(str);
         if (Array.isArray(parsed)) {
-          const arr = parsed.map((item) => String(item).trim()).filter(Boolean);
+          const arr = parsed
+            .map((item) => this.coerceArrayItemToString(item))
+            .filter((item): item is string => Boolean(item));
           return arr.length > 0 ? arr : undefined;
         }
       } catch {
@@ -1136,5 +1168,30 @@ export class ProductService {
       .map((item) => item.trim())
       .filter(Boolean);
     return arr.length > 0 ? arr : undefined;
+  }
+
+  private coerceArrayItemToString(value: unknown): string | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed || undefined;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return undefined;
+  }
+
+  private isStringifiablePrimitive(
+    value: unknown,
+  ): value is string | number | boolean | bigint {
+    return (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      typeof value === 'bigint'
+    );
   }
 }

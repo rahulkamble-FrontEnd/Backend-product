@@ -18,6 +18,7 @@ import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { Tag } from './tag.entity';
 import { TagsService } from './tags.service';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 @Controller('tags')
 export class TagsController {
@@ -31,7 +32,10 @@ export class TagsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @Post()
-  async create(@Body() dto: CreateTagDto, @Req() req: any): Promise<Tag> {
+  async create(
+    @Body() dto: CreateTagDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<Tag> {
     return this.tagsService.create(dto, req.user.id);
   }
 

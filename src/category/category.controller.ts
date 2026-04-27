@@ -21,6 +21,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import type { OptionalAuthenticatedRequest } from '../auth/types/auth-user.type';
 
 @Controller('categories')
 export class CategoryController {
@@ -37,7 +38,7 @@ export class CategoryController {
     @Query('type') type?: string,
     @Query('productLimit') productLimit?: string,
     @Query('includeChildren') includeChildren?: string,
-    @Req() req?: any,
+    @Req() req?: OptionalAuthenticatedRequest,
   ): Promise<CategoryMenuItem[]> {
     const parsedProductLimit = Number.parseInt(productLimit ?? '', 10);
     const safeProductLimit = Number.isNaN(parsedProductLimit)

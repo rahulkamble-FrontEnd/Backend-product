@@ -16,6 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 @Controller('users')
 export class UserController {
@@ -27,7 +28,10 @@ export class UserController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN)
   @Post()
-  async create(@Body() createUserDto: CreateUserDto, @Request() req) {
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
     const adminId = req.user.id;
     return this.userService.create(createUserDto, adminId);
   }
