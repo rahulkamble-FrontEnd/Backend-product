@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import type { FindOptionsWhere } from 'typeorm';
 import { Category } from './category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -41,10 +41,13 @@ export class CategoryService {
     private productCategoryRepository: Repository<ProductCategory>,
   ) {}
 
-  async findAll(type?: string): Promise<Category[]> {
+  async findAll(type?: string, includeSubcategories = false): Promise<Category[]> {
     const where: FindOptionsWhere<Category> = { isActive: true };
     if (type) {
       where.type = type;
+    }
+    if (!includeSubcategories) {
+      where.parent = IsNull();
     }
     return this.categoryRepository.find({ where });
   }

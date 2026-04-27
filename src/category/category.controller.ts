@@ -28,8 +28,12 @@ export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Get()
-  async findAll(@Query('type') type?: string): Promise<Category[]> {
-    return this.categoryService.findAll(type);
+  async findAll(
+    @Query('type') type?: string,
+    @Query('includeSubcategories') includeSubcategories?: string,
+  ): Promise<Category[]> {
+    const shouldIncludeSubcategories = includeSubcategories === 'true';
+    return this.categoryService.findAll(type, shouldIncludeSubcategories);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
