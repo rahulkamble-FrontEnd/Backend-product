@@ -17,7 +17,6 @@ import {
 } from '@nestjs/common';
 import {
   FileFieldsInterceptor,
-  FileInterceptor,
 } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProductService } from './product.service';
@@ -42,7 +41,13 @@ const ALLOWED_SPREADSHEET_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
 ];
+const ALLOWED_ZIP_MIME_TYPES = [
+  'application/zip',
+  'application/x-zip-compressed',
+  'multipart/x-zip',
+];
 const MAX_SPREADSHEET_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 
 @Controller('products')
 export class ProductController {
@@ -95,33 +100,72 @@ export class ProductController {
   @Roles(UserRole.ADMIN)
   @Post('bulk-upload')
   @UseInterceptors(
-    FileInterceptor('file', {
+    FileFieldsInterceptor(
+      [
+        { name: 'file', maxCount: 1 },
+        { name: 'imagesZip', maxCount: 1 },
+      ],
+      {
       storage: memoryStorage(),
-      limits: { fileSize: MAX_SPREADSHEET_SIZE_BYTES },
-      fileFilter: (_req, file, cb) => {
-        const hasXlsxExtension = file.originalname
-          .toLowerCase()
-          .endsWith('.xlsx');
-        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
-          file.mimetype,
-        );
-        const isGenericBinaryXlsx =
-          file.mimetype === 'application/octet-stream' && hasXlsxExtension;
-
-        if (!allowedMimeType && !isGenericBinaryXlsx) {
-          return cb(
-            new BadRequestException(
-              `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
-            ),
-            false,
-          );
-        }
-        cb(null, true);
+      limits: {
+        fileSize: MAX_ZIP_SIZE_BYTES,
+        files: 2,
       },
-    }),
+      fileFilter: (_req, file, cb) => {
+        const originalName = file.originalname.toLowerCase();
+        const isSpreadsheetField = file.fieldname === 'file';
+        const isZipField = file.fieldname === 'imagesZip';
+
+        if (isSpreadsheetField) {
+          const hasXlsxExtension = originalName.endsWith('.xlsx');
+          const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
+            file.mimetype,
+          );
+          const isGenericBinaryXlsx =
+            file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+          if (!allowedMimeType && !isGenericBinaryXlsx) {
+            return cb(
+              new BadRequestException(
+                `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+              ),
+              false,
+            );
+          }
+          return cb(null, true);
+        }
+
+        if (isZipField) {
+          const hasZipExtension = originalName.endsWith('.zip');
+          const allowedMimeType =
+            ALLOWED_ZIP_MIME_TYPES.includes(file.mimetype) ||
+            file.mimetype === 'application/octet-stream';
+          if (!hasZipExtension || !allowedMimeType) {
+            return cb(
+              new BadRequestException(
+                `Unsupported ZIP file type "${file.mimetype}". Upload a .zip file in "imagesZip".`,
+              ),
+              false,
+            );
+          }
+          return cb(null, true);
+        }
+
+        return cb(
+          new BadRequestException(
+            `Unsupported field "${file.fieldname}". Use "file" and optional "imagesZip".`,
+          ),
+          false,
+        );
+      },
+      },
+    ),
   )
   async bulkUploadProducts(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    filesByField: {
+      file?: Express.Multer.File[];
+      imagesZip?: Express.Multer.File[];
+    },
     @Req() req: any,
   ): Promise<{
     totalRows: number;
@@ -130,12 +174,21 @@ export class ProductController {
     created: Array<{ row: number; id: string; sku: string; name: string }>;
     errors: Array<{ row: number; message: string }>;
   }> {
+    const file = filesByField?.file?.[0];
+    const imagesZip = filesByField?.imagesZip?.[0];
+
     if (!file) {
       throw new BadRequestException(
         'Spreadsheet file is required. Send it as multipart/form-data with field name "file".',
       );
     }
-    return this.productService.bulkCreateFromXlsx(file, req.user);
+    if (file.size > MAX_SPREADSHEET_SIZE_BYTES) {
+      throw new BadRequestException(
+        `Spreadsheet is too large. Max allowed: ${MAX_SPREADSHEET_SIZE_BYTES / (1024 * 1024)} MB.`,
+      );
+    }
+
+    return this.productService.bulkCreateFromXlsx(file, imagesZip, req.user);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

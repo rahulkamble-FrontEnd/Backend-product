@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
+import AdmZip from 'adm-zip';
 import { Product } from './product.entity';
 import { ProductCategory } from './product-category.entity';
 import { ProductImage } from './product-image.entity';
@@ -119,6 +120,7 @@ export class ProductService {
 
   async bulkCreateFromXlsx(
     file: Express.Multer.File,
+    imagesZipFile: Express.Multer.File | undefined,
     user: any,
   ): Promise<{
     totalRows: number;
@@ -154,12 +156,14 @@ export class ProductService {
       name: string;
     }> = [];
     const errors: Array<{ row: number; message: string }> = [];
+    const zipImagesBySku = this.buildZipImagesBySku(imagesZipFile);
 
     for (let index = 0; index < rawRows.length; index++) {
       const excelRowNumber = index + 2; // Header row is row 1
       try {
         const dto = this.buildCreateProductDtoFromRow(rawRows[index]);
         const product = await this.create(dto, user);
+        await this.uploadBulkImagesFromZip(product.id, product.sku, zipImagesBySku);
         created.push({
           row: excelRowNumber,
           id: product.id,
@@ -184,6 +188,103 @@ export class ProductService {
       created,
       errors,
     };
+  }
+
+  private buildZipImagesBySku(
+    imagesZipFile: Express.Multer.File | undefined,
+  ): Map<string, Array<{ sequence: number; fileName: string; file: Buffer }>> {
+    const imagesBySku = new Map<
+      string,
+      Array<{ sequence: number; fileName: string; file: Buffer }>
+    >();
+
+    if (!imagesZipFile?.buffer || imagesZipFile.buffer.length === 0) {
+      return imagesBySku;
+    }
+
+    const zip = new AdmZip(imagesZipFile.buffer);
+    const entries = zip.getEntries();
+
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        continue;
+      }
+
+      const fileName = entry.entryName.split('/').pop()?.trim() ?? '';
+      if (!fileName) {
+        continue;
+      }
+
+      const parsed = this.parseBulkImageFileName(fileName);
+      if (!parsed) {
+        continue;
+      }
+
+      const fileBuffer = entry.getData();
+      if (!fileBuffer || fileBuffer.length === 0) {
+        continue;
+      }
+
+      const list = imagesBySku.get(parsed.sku) ?? [];
+      list.push({
+        sequence: parsed.sequence,
+        fileName,
+        file: fileBuffer,
+      });
+      imagesBySku.set(parsed.sku, list);
+    }
+
+    for (const list of imagesBySku.values()) {
+      list.sort((a, b) => a.sequence - b.sequence || a.fileName.localeCompare(b.fileName));
+    }
+
+    return imagesBySku;
+  }
+
+  private parseBulkImageFileName(
+    fileName: string,
+  ): { sku: string; sequence: number } | null {
+    const match = /^(.+)-(\d+)\.(jpe?g|png|webp)$/i.exec(fileName);
+    if (!match) {
+      return null;
+    }
+    const sequence = Number(match[2]);
+    if (!Number.isInteger(sequence) || sequence <= 0) {
+      return null;
+    }
+
+    return { sku: match[1], sequence };
+  }
+
+  private getMimeTypeFromFileName(fileName: string): string {
+    const ext = extname(fileName).toLowerCase();
+    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+    if (ext === '.png') return 'image/png';
+    if (ext === '.webp') return 'image/webp';
+    throw new BadRequestException(`Unsupported image extension in "${fileName}"`);
+  }
+
+  private async uploadBulkImagesFromZip(
+    productId: string,
+    sku: string,
+    zipImagesBySku: Map<string, Array<{ sequence: number; fileName: string; file: Buffer }>>,
+  ): Promise<void> {
+    const images = zipImagesBySku.get(sku);
+    if (!images || images.length === 0) {
+      return;
+    }
+
+    const selectedImages = images.slice(0, 3);
+    for (let index = 0; index < selectedImages.length; index++) {
+      const image = selectedImages[index];
+      await this.saveProductImageFromBuffer(
+        productId,
+        image.fileName,
+        image.file,
+        this.getMimeTypeFromFileName(image.fileName),
+        { displayOrder: index, isPrimary: index === 0 },
+      );
+    }
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<Product> {
@@ -628,39 +729,13 @@ export class ProductService {
       );
     }
 
-    // 2. Build a unique S3 key: products/{productId}/{uuid}.ext
-    const fileExt = extname(file.originalname).toLowerCase();
-    const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
-
-    // 3. Upload to S3
-    const uploadedKey = await this.s3Service.uploadFile(
-      s3Key,
+    return this.saveProductImageFromBuffer(
+      productId,
+      file.originalname,
       file.buffer,
       file.mimetype,
+      dto,
     );
-
-    // 4. If isPrimary=true, reset all other images for this product
-    if (dto.isPrimary) {
-      await this.productImageRepository.update(
-        { productId },
-        { isPrimary: false },
-      );
-    }
-
-    // 5. Save image record to DB
-    const productImage = this.productImageRepository.create({
-      productId,
-      s3Key: uploadedKey,
-      displayOrder: dto.displayOrder ?? 0,
-      isPrimary: dto.isPrimary ?? false,
-    });
-
-    const savedImage = await this.productImageRepository.save(productImage);
-
-    // 6. Attach public URL (not persisted, convenience response)
-    (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
-
-    return savedImage;
   }
 
   async uploadImages(
@@ -704,26 +779,50 @@ export class ProductService {
     const uploadedImages: ProductImage[] = [];
     for (let index = 0; index < files.length; index++) {
       const file = files[index];
-      const fileExt = extname(file.originalname).toLowerCase();
-      const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
-      const uploadedKey = await this.s3Service.uploadFile(
-        s3Key,
+      const savedImage = await this.saveProductImageFromBuffer(
+        productId,
+        file.originalname,
         file.buffer,
         file.mimetype,
+        {
+          displayOrder: (dto.displayOrder ?? 0) + index,
+          isPrimary: dto.isPrimary ? index === 0 : false,
+        },
       );
-
-      const productImage = this.productImageRepository.create({
-        productId,
-        s3Key: uploadedKey,
-        displayOrder: (dto.displayOrder ?? 0) + index,
-        isPrimary: dto.isPrimary ? index === 0 : false,
-      });
-      const savedImage = await this.productImageRepository.save(productImage);
-      (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
       uploadedImages.push(savedImage);
     }
 
     return uploadedImages;
+  }
+
+  private async saveProductImageFromBuffer(
+    productId: string,
+    originalName: string,
+    buffer: Buffer,
+    mimeType: string,
+    dto: UploadProductImageDto,
+  ): Promise<ProductImage> {
+    const fileExt = extname(originalName).toLowerCase();
+    const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
+    const uploadedKey = await this.s3Service.uploadFile(s3Key, buffer, mimeType);
+
+    if (dto.isPrimary) {
+      await this.productImageRepository.update(
+        { productId },
+        { isPrimary: false },
+      );
+    }
+
+    const productImage = this.productImageRepository.create({
+      productId,
+      s3Key: uploadedKey,
+      displayOrder: dto.displayOrder ?? 0,
+      isPrimary: dto.isPrimary ?? false,
+    });
+
+    const savedImage = await this.productImageRepository.save(productImage);
+    (savedImage as any).url = this.s3Service.getPublicUrl(uploadedKey);
+    return savedImage;
   }
 
   async linkCategories(
