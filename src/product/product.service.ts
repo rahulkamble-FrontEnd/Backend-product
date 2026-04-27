@@ -361,9 +361,13 @@ export class ProductService {
     if (includeCategories) {
       qb.leftJoinAndSelect('product.productCategories', 'productCategory');
       qb.leftJoinAndSelect('productCategory.category', 'category');
-    } else if (query.categoryId || query.categoryType) {
+    } else if (query.categoryId || query.categoryType || query.categorySlug) {
       qb.leftJoin('product.productCategories', 'productCategory');
       qb.leftJoin('productCategory.category', 'category');
+    }
+
+    if (query.categorySlug) {
+      qb.leftJoin('category.parent', 'parentCategory');
     }
 
     if (query.status) {
@@ -393,6 +397,20 @@ export class ProductService {
       qb.andWhere('category.type = :categoryType', {
         categoryType: query.categoryType,
       });
+    }
+
+    if (query.categorySlug) {
+      qb.andWhere(
+        new Brackets((whereQb) => {
+          whereQb
+            .where('category.slug = :categorySlug', {
+              categorySlug: query.categorySlug,
+            })
+            .orWhere('parentCategory.slug = :categorySlug', {
+              categorySlug: query.categorySlug,
+            });
+        }),
+      );
     }
 
     const sortByMap: Record<string, string> = {
