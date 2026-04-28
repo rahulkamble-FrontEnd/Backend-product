@@ -12,6 +12,7 @@ import { BlogModule } from './blog/blog.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { TrendingModule } from './trending/trending.module';
 import { TagsModule } from './tags/tags.module';
+import { DesignCfModule } from './design-cf/design-cf.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { TagsModule } from './tags/tags.module';
     PortfolioModule,
     TrendingModule,
     TagsModule,
+    DesignCfModule,
   ],
   controllers: [AppController],
   providers: [],

@@ -41,7 +41,10 @@ export class CategoryService {
     private productCategoryRepository: Repository<ProductCategory>,
   ) {}
 
-  async findAll(type?: string, includeSubcategories = false): Promise<Category[]> {
+  async findAll(
+    type?: string,
+    includeSubcategories = false,
+  ): Promise<Category[]> {
     const where: FindOptionsWhere<Category> = { isActive: true };
     if (type) {
       where.type = type;
