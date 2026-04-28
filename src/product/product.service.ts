@@ -420,9 +420,34 @@ export class ProductService {
     }
 
     if (query.categoryId) {
-      qb.andWhere('productCategory.categoryId = :categoryId', {
-        categoryId: query.categoryId,
+      const requestedCategory = await this.categoryRepository.findOne({
+        where: { id: query.categoryId },
+        relations: ['parent'],
       });
+
+      if (requestedCategory && !requestedCategory.parent) {
+        const childCategoryRows = await this.categoryRepository
+          .createQueryBuilder('childCategory')
+          .leftJoin('childCategory.parent', 'parentCategory')
+          .select('childCategory.id', 'id')
+          .where('parentCategory.id = :parentId', { parentId: query.categoryId })
+          .getRawMany<{ id: string }>();
+
+        const categoryIds = Array.from(
+          new Set([
+            query.categoryId,
+            ...childCategoryRows.map((row) => row.id).filter(Boolean),
+          ]),
+        );
+
+        qb.andWhere('productCategory.categoryId IN (:...categoryIds)', {
+          categoryIds,
+        });
+      } else {
+        qb.andWhere('productCategory.categoryId = :categoryId', {
+          categoryId: query.categoryId,
+        });
+      }
     }
 
     if (query.categoryType) {
