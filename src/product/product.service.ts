@@ -430,7 +430,9 @@ export class ProductService {
           .createQueryBuilder('childCategory')
           .leftJoin('childCategory.parent', 'parentCategory')
           .select('childCategory.id', 'id')
-          .where('parentCategory.id = :parentId', { parentId: query.categoryId })
+          .where('parentCategory.id = :parentId', {
+            parentId: query.categoryId,
+          })
           .getRawMany<{ id: string }>();
 
         const categoryIds = Array.from(
@@ -475,7 +477,9 @@ export class ProductService {
     }
 
     if (finishFilters.length > 0) {
-      qb.andWhere('product.finishType IN (:...finishFilters)', { finishFilters });
+      qb.andWhere('product.finishType IN (:...finishFilters)', {
+        finishFilters,
+      });
     }
 
     if (thicknessFilters.length > 0) {
