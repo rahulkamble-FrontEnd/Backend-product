@@ -323,8 +323,12 @@ export class ProductService {
     }
 
     if (dto.sku !== undefined) updateData.sku = dto.sku;
+    if (dto.imsId !== undefined) updateData.imsId = dto.imsId;
     if (dto.brand !== undefined) updateData.brand = dto.brand;
     if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.bookName !== undefined) updateData.bookName = dto.bookName;
+    if (dto.pageNumber !== undefined) updateData.pageNumber = dto.pageNumber;
+    if (dto.application !== undefined) updateData.application = dto.application;
     if (dto.materialType !== undefined)
       updateData.materialType = dto.materialType;
     if (dto.finishType !== undefined) updateData.finishType = dto.finishType;
@@ -448,7 +452,11 @@ export class ProductService {
         name: p.name,
         slug: p.slug,
         sku: p.sku,
+        imsId: p.imsId,
         description: p.description,
+        bookName: p.bookName,
+        pageNumber: p.pageNumber,
+        application: p.application,
         materialType: p.materialType,
         finishType: p.finishType,
         colorName: p.colorName,
@@ -528,6 +536,11 @@ export class ProductService {
       name: product.name,
       slug: product.slug,
       sku: product.sku,
+      imsId: product.imsId,
+      description: product.description,
+      bookName: product.bookName,
+      pageNumber: product.pageNumber,
+      application: product.application,
       materialType: product.materialType,
       finishType: product.finishType,
       colorName: product.colorName,
@@ -631,6 +644,11 @@ export class ProductService {
         name: p.name,
         slug: p.slug,
         sku: p.sku,
+        imsId: p.imsId,
+        description: p.description,
+        bookName: p.bookName,
+        pageNumber: p.pageNumber,
+        application: p.application,
         materialType: p.materialType,
         finishType: p.finishType,
         colorName: p.colorName,
@@ -659,7 +677,11 @@ export class ProductService {
     });
 
     const fields = [
+      { key: 'imsId', values: normalized.map((p) => p.imsId) },
       { key: 'name', values: normalized.map((p) => p.name) },
+      { key: 'bookName', values: normalized.map((p) => p.bookName) },
+      { key: 'pageNumber', values: normalized.map((p) => p.pageNumber) },
+      { key: 'application', values: normalized.map((p) => p.application) },
       { key: 'materialType', values: normalized.map((p) => p.materialType) },
       { key: 'finishType', values: normalized.map((p) => p.finishType) },
       { key: 'colorName', values: normalized.map((p) => p.colorName) },
@@ -1057,12 +1079,16 @@ export class ProductService {
 
     const name = this.toOptionalString(normalizedRow.name);
     const sku = this.toOptionalString(normalizedRow.sku);
+    const imsId = this.toOptionalString(normalizedRow.imsid);
 
     if (!name) {
       throw new BadRequestException('Missing required field "name"');
     }
     if (!sku) {
       throw new BadRequestException('Missing required field "sku"');
+    }
+    if (!imsId) {
+      throw new BadRequestException('Missing required field "imsId"');
     }
 
     const status = this.toOptionalString(normalizedRow.status);
@@ -1080,8 +1106,12 @@ export class ProductService {
     return {
       name,
       sku,
+      imsId,
       brand: this.toOptionalString(normalizedRow.brand),
       description: this.toOptionalString(normalizedRow.description),
+      bookName: this.toOptionalString(normalizedRow.bookname),
+      pageNumber: this.toOptionalString(normalizedRow.pagenumber),
+      application: this.toOptionalString(normalizedRow.application),
       materialType: this.toOptionalString(normalizedRow.materialtype),
       finishType: this.toOptionalString(normalizedRow.finishtype),
       colorName: this.toOptionalString(normalizedRow.colorname),

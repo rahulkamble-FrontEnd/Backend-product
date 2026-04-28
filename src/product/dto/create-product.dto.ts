@@ -10,6 +10,10 @@ import {
 export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
+  imsId: string;
+
+  @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsString()
@@ -23,6 +27,18 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  bookName?: string;
+
+  @IsString()
+  @IsOptional()
+  pageNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  application?: string;
 
   @IsString()
   @IsOptional()
