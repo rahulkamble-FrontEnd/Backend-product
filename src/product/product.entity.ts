@@ -22,6 +22,9 @@ export class Product {
   @Column({ type: 'varchar', length: 255, nullable: false })
   name: string;
 
+  @Column({ name: 'ims_id', type: 'varchar', length: 120, nullable: false })
+  imsId: string;
+
   @Column({ type: 'varchar', length: 270, unique: true, nullable: false })
   slug: string;
 
@@ -33,6 +36,15 @@ export class Product {
 
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  @Column({ name: 'book_name', type: 'varchar', length: 255, nullable: true })
+  bookName: string;
+
+  @Column({ name: 'page_number', type: 'varchar', length: 100, nullable: true })
+  pageNumber: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  application: string;
 
   @Column({
     name: 'material_type',

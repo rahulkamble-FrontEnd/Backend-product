@@ -11,6 +11,11 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   @IsNotEmpty()
+  imsId?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsNotEmpty()
   name?: string;
 
   @IsString()
@@ -25,6 +30,18 @@ export class UpdateProductDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  bookName?: string;
+
+  @IsString()
+  @IsOptional()
+  pageNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  application?: string;
 
   @IsString()
   @IsOptional()
