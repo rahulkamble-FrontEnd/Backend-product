@@ -48,7 +48,8 @@ const ALLOWED_ZIP_MIME_TYPES = [
   'multipart/x-zip',
 ];
 const MAX_SPREADSHEET_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+const ZIP_UPLOAD_MAX_MB = Number(process.env.ZIP_UPLOAD_MAX_MB ?? 300);
+const MAX_ZIP_SIZE_BYTES = ZIP_UPLOAD_MAX_MB * 1024 * 1024;
 
 @Controller('products')
 export class ProductController {
@@ -64,6 +65,12 @@ export class ProductController {
     total: number;
     page: number;
     limit: number;
+    filters: {
+      finishes: string[];
+      brands: string[];
+      thicknesses: string[];
+      colors: string[];
+    };
   }> {
     return this.productService.listProducts(query, req.user?.role);
   }
