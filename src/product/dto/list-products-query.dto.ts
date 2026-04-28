@@ -58,4 +58,20 @@ export class ListProductsQueryDto {
   @IsOptional()
   @IsIn(['true', 'false'])
   includeCategories?: string;
+
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @IsOptional()
+  @IsString()
+  finishType?: string;
+
+  @IsOptional()
+  @IsString()
+  thickness?: string;
+
+  @IsOptional()
+  @IsString()
+  colorName?: string;
 }

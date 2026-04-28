@@ -65,6 +65,12 @@ export class ProductController {
     total: number;
     page: number;
     limit: number;
+    filters: {
+      finishes: string[];
+      brands: string[];
+      thicknesses: string[];
+      colors: string[];
+    };
   }> {
     return this.productService.listProducts(query, req.user?.role);
   }
