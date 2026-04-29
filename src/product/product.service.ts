@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Brackets } from 'typeorm';
+import { Repository, In, Brackets, EntityManager } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import AdmZip from 'adm-zip';
@@ -119,6 +119,160 @@ export class ProductService {
     });
   }
 
+  /**
+   * Same logic as `create()`, but executed inside an existing transaction.
+   * This avoids committing per-row when we need bulk all-or-nothing behavior.
+   */
+  private async createInManager(
+    createProductDto: CreateProductDto,
+    user: AuthUser,
+    manager: EntityManager,
+  ): Promise<Product> {
+    const { categoryIds, ...productData } = createProductDto;
+    const normalizedCategoryIds = Array.from(
+      new Set((categoryIds ?? []).map((id) => id?.trim()).filter(Boolean)),
+    );
+
+    if (normalizedCategoryIds.length > 0) {
+      const txCategoryRepository = manager.getRepository(Category);
+      const existingCategories = await txCategoryRepository.find({
+        where: { id: In(normalizedCategoryIds) },
+        relations: ['parent'],
+      });
+      const existingCategoryIds = new Set(
+        existingCategories.map((cat) => cat.id),
+      );
+      const invalidCategoryIds = normalizedCategoryIds.filter(
+        (id) => !existingCategoryIds.has(id),
+      );
+      if (invalidCategoryIds.length > 0) {
+        throw new BadRequestException(
+          `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
+        );
+      }
+
+      const nonSubCategoryIds = existingCategories
+        .filter((cat) => !cat.parent)
+        .map((cat) => cat.id);
+      if (nonSubCategoryIds.length > 0) {
+        throw new BadRequestException(
+          `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
+        );
+      }
+    }
+
+    if (productData.status === 'published') {
+      productData.status = 'active';
+    }
+
+    // Create unique slug from name (same behavior as single create()).
+    const slug =
+      productData.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '') +
+      '-' +
+      Date.now().toString().slice(-4);
+
+    const txProductRepository = manager.getRepository(Product);
+    const txProductCategoryRepository = manager.getRepository(ProductCategory);
+
+    const newProduct = txProductRepository.create({
+      ...productData,
+      slug,
+      createdBy: { id: user.id },
+    });
+
+    const savedProduct = await txProductRepository.save(newProduct);
+
+    if (normalizedCategoryIds.length > 0) {
+      const productCategories = normalizedCategoryIds.map((categoryId) =>
+        txProductCategoryRepository.create({
+          productId: savedProduct.id,
+          categoryId,
+        }),
+      );
+      await txProductCategoryRepository.save(productCategories);
+    }
+
+    return savedProduct;
+  }
+
+  private async saveProductImageFromBufferWithManager(
+    manager: EntityManager,
+    productId: string,
+    originalName: string,
+    buffer: Buffer,
+    mimeType: string,
+    dto: UploadProductImageDto,
+    uploadedS3Keys: string[],
+  ): Promise<ProductImage> {
+    const fileExt = extname(originalName).toLowerCase();
+    const s3Key = `products/${productId}/${uuidv4()}${fileExt}`;
+    const uploadedKey = await this.s3Service.uploadFile(
+      s3Key,
+      buffer,
+      mimeType,
+    );
+    uploadedS3Keys.push(uploadedKey);
+
+    const txProductImageRepository =
+      manager.getRepository<ProductImage>(ProductImage);
+
+    if (dto.isPrimary) {
+      // Ensure only one primary image.
+      await txProductImageRepository.update(
+        { productId },
+        { isPrimary: false },
+      );
+    }
+
+    const productImage = txProductImageRepository.create({
+      productId,
+      s3Key: uploadedKey,
+      displayOrder: dto.displayOrder ?? 0,
+      isPrimary: dto.isPrimary ?? false,
+    });
+
+    const savedImage = await txProductImageRepository.save(productImage);
+    return {
+      ...savedImage,
+      url: this.s3Service.getPublicUrl(uploadedKey),
+    } as ProductImage;
+  }
+
+  private async uploadBulkImagesFromZipWithManager(
+    manager: EntityManager,
+    productId: string,
+    sku: string,
+    zipImagesBySku: Map<
+      string,
+      Array<{ sequence: number; fileName: string; file: Buffer }>
+    >,
+    uploadedS3Keys: string[],
+  ): Promise<void> {
+    const images = zipImagesBySku.get(sku);
+    if (!images || images.length === 0) {
+      return;
+    }
+
+    const selectedImages = images.slice(0, 3);
+    for (let index = 0; index < selectedImages.length; index++) {
+      const image = selectedImages[index];
+      await this.saveProductImageFromBufferWithManager(
+        manager,
+        productId,
+        image.fileName,
+        image.file,
+        this.getMimeTypeFromFileName(image.fileName),
+        { displayOrder: index, isPrimary: index === 0 },
+        uploadedS3Keys,
+      );
+    }
+  }
+
   async bulkCreateFromXlsx(
     file: Express.Multer.File,
     imagesZipFile: Express.Multer.File | undefined,
@@ -128,7 +282,7 @@ export class ProductService {
     createdCount: number;
     failedCount: number;
     created: Array<{ row: number; id: string; sku: string; name: string }>;
-    errors: Array<{ row: number; message: string }>;
+    errors: Array<{ row: number; sku?: string; message: string }>;
   }> {
     if (!file?.buffer || file.buffer.length === 0) {
       throw new BadRequestException('Uploaded spreadsheet is empty');
@@ -156,43 +310,87 @@ export class ProductService {
       sku: string;
       name: string;
     }> = [];
-    const errors: Array<{ row: number; message: string }> = [];
+    const errors: Array<{ row: number; sku?: string; message: string }> = [];
     const zipImagesBySku = this.buildZipImagesBySku(imagesZipFile);
 
-    for (let index = 0; index < rawRows.length; index++) {
-      const excelRowNumber = index + 2; // Header row is row 1
-      try {
-        const dto = this.buildCreateProductDtoFromRow(rawRows[index]);
-        const product = await this.create(dto, user);
-        await this.uploadBulkImagesFromZip(
-          product.id,
-          product.sku,
-          zipImagesBySku,
-        );
-        created.push({
-          row: excelRowNumber,
-          id: product.id,
-          sku: product.sku,
-          name: product.name,
-        });
-      } catch (error: unknown) {
-        errors.push({
-          row: excelRowNumber,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Failed to create product for this row',
-        });
-      }
-    }
+    const uploadedS3Keys: string[] = [];
 
-    return {
-      totalRows: rawRows.length,
-      createdCount: created.length,
-      failedCount: errors.length,
-      created,
-      errors,
-    };
+    try {
+      // All-or-nothing: if any row fails, we rollback the whole transaction.
+      const result = await this.productRepository.manager.transaction(
+        async (manager) => {
+          for (let index = 0; index < rawRows.length; index++) {
+            const excelRowNumber = index + 2; // Header row is row 1
+            try {
+              const dto = this.buildCreateProductDtoFromRow(rawRows[index]);
+              const product = await this.createInManager(dto, user, manager);
+              await this.uploadBulkImagesFromZipWithManager(
+                manager,
+                product.id,
+                product.sku,
+                zipImagesBySku,
+                uploadedS3Keys,
+              );
+              created.push({
+                row: excelRowNumber,
+                id: product.id,
+                sku: product.sku,
+                name: product.name,
+              });
+            } catch (error: unknown) {
+              const sku = this.extractSkuFromRow(rawRows[index]);
+              errors.push({
+                row: excelRowNumber,
+                sku,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to create product for this row',
+              });
+            }
+          }
+
+          if (errors.length > 0) {
+            // Trigger rollback.
+            throw new Error('BULK_UPLOAD_HAS_ERRORS');
+          }
+
+          return {
+            totalRows: rawRows.length,
+            createdCount: created.length,
+            failedCount: 0,
+            created,
+            errors: [],
+          };
+        },
+      );
+
+      return result;
+    } catch (error: unknown) {
+      // Best-effort cleanup for images already uploaded to S3.
+      if (uploadedS3Keys.length > 0) {
+        await Promise.allSettled(
+          uploadedS3Keys.map((key) => this.s3Service.deleteFile(key)),
+        );
+      }
+
+      const isBulkRollback =
+        error instanceof Error && error.message === 'BULK_UPLOAD_HAS_ERRORS';
+
+      if (isBulkRollback) {
+        // Return a normal payload so the FE can render row-level errors,
+        // but the DB transaction has already been rolled back.
+        return {
+          totalRows: rawRows.length,
+          createdCount: 0,
+          failedCount: errors.length,
+          created: [],
+          errors,
+        };
+      }
+
+      throw error;
+    }
   }
 
   private buildZipImagesBySku(
@@ -1255,6 +1453,14 @@ export class ProductService {
 
   private normalizeHeaderKey(input: string): string {
     return input.toLowerCase().replace(/[\s_-]+/g, '');
+  }
+
+  private extractSkuFromRow(row: Record<string, unknown>): string | undefined {
+    for (const [key, value] of Object.entries(row)) {
+      if (this.normalizeHeaderKey(key) !== 'sku') continue;
+      return this.toOptionalString(value);
+    }
+    return undefined;
   }
 
   private toOptionalString(value: unknown): string | undefined {
