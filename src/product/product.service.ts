@@ -362,12 +362,27 @@ export class ProductService {
   async listProducts(
     query: ListProductsQueryDto,
     requesterRole?: string,
-  ): Promise<{ items: unknown[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    items: unknown[];
+    total: number;
+    page: number;
+    limit: number;
+    filters: {
+      finishes: string[];
+      brands: string[];
+      thicknesses: string[];
+      colors: string[];
+    };
+  }> {
     const hideBrand = requesterRole === UserRole.CUSTOMER;
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const includeImages = query.includeImages === 'true';
     const includeCategories = query.includeCategories === 'true';
+    const brandFilters = this.parseCsvFilter(query.brand);
+    const finishFilters = this.parseCsvFilter(query.finishType);
+    const thicknessFilters = this.parseCsvFilter(query.thickness);
+    const colorFilters = this.parseCsvFilter(query.colorName);
 
     const qb = this.productRepository.createQueryBuilder('product');
 
@@ -405,9 +420,36 @@ export class ProductService {
     }
 
     if (query.categoryId) {
-      qb.andWhere('productCategory.categoryId = :categoryId', {
-        categoryId: query.categoryId,
+      const requestedCategory = await this.categoryRepository.findOne({
+        where: { id: query.categoryId },
+        relations: ['parent'],
       });
+
+      if (requestedCategory && !requestedCategory.parent) {
+        const childCategoryRows = await this.categoryRepository
+          .createQueryBuilder('childCategory')
+          .leftJoin('childCategory.parent', 'parentCategory')
+          .select('childCategory.id', 'id')
+          .where('parentCategory.id = :parentId', {
+            parentId: query.categoryId,
+          })
+          .getRawMany<{ id: string }>();
+
+        const categoryIds = Array.from(
+          new Set([
+            query.categoryId,
+            ...childCategoryRows.map((row) => row.id).filter(Boolean),
+          ]),
+        );
+
+        qb.andWhere('productCategory.categoryId IN (:...categoryIds)', {
+          categoryIds,
+        });
+      } else {
+        qb.andWhere('productCategory.categoryId = :categoryId', {
+          categoryId: query.categoryId,
+        });
+      }
     }
 
     if (query.categoryType) {
@@ -429,6 +471,41 @@ export class ProductService {
         }),
       );
     }
+
+    if (brandFilters.length > 0) {
+      qb.andWhere('product.brand IN (:...brandFilters)', { brandFilters });
+    }
+
+    if (finishFilters.length > 0) {
+      qb.andWhere('product.finishType IN (:...finishFilters)', {
+        finishFilters,
+      });
+    }
+
+    if (thicknessFilters.length > 0) {
+      qb.andWhere('product.thickness IN (:...thicknessFilters)', {
+        thicknessFilters,
+      });
+    }
+
+    if (colorFilters.length > 0) {
+      qb.andWhere('product.colorName IN (:...colorFilters)', { colorFilters });
+    }
+
+    const filterRows = await qb
+      .clone()
+      .select([
+        'product.brand AS brand',
+        'product.finishType AS finishType',
+        'product.thickness AS thickness',
+        'product.colorName AS colorName',
+      ])
+      .getRawMany<{
+        brand: string | null;
+        finishType: string | null;
+        thickness: string | null;
+        colorName: string | null;
+      }>();
 
     const sortByMap: Record<string, string> = {
       createdAt: 'product.createdAt',
@@ -505,7 +582,51 @@ export class ProductService {
       return item;
     });
 
-    return { items, total, page, limit };
+    const brands = this.extractCleanFilterValues(filterRows, 'brand');
+    const finishes = this.extractCleanFilterValues(filterRows, 'finishType');
+    const thicknesses = this.extractCleanFilterValues(filterRows, 'thickness');
+    const colors = this.extractCleanFilterValues(filterRows, 'colorName');
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      filters: { finishes, brands, thicknesses, colors },
+    };
+  }
+
+  private parseCsvFilter(value?: string): string[] {
+    if (!value) {
+      return [];
+    }
+    return Array.from(
+      new Set(
+        value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    );
+  }
+
+  private extractCleanFilterValues<T extends Record<string, string | null>>(
+    rows: T[],
+    key: keyof T,
+  ): string[] {
+    const values = new Set<string>();
+    for (const row of rows) {
+      const raw = row[key];
+      if (typeof raw !== 'string') {
+        continue;
+      }
+      const cleaned = raw.trim();
+      if (!cleaned || !/[a-z0-9]/i.test(cleaned)) {
+        continue;
+      }
+      values.add(cleaned);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
   }
 
   async getProductBySlug(
