@@ -450,16 +450,22 @@ export class ProductService {
   private parseBulkImageFileName(
     fileName: string,
   ): { sku: string; sequence: number } | null {
-    const match = /^(.+)-(\d+)\.(jpe?g|png|webp)$/i.exec(fileName);
-    if (!match) {
-      return null;
+    // Accept both "SKU.jpg" (single image) and "SKU-1.jpg" (explicit order).
+    const withSequence = /^(.+)-(\d+)\.(jpe?g|png|webp)$/i.exec(fileName);
+    if (withSequence) {
+      const sequence = Number(withSequence[2]);
+      if (!Number.isInteger(sequence) || sequence <= 0) {
+        return null;
+      }
+      return { sku: withSequence[1], sequence };
     }
-    const sequence = Number(match[2]);
-    if (!Number.isInteger(sequence) || sequence <= 0) {
+
+    const singleImage = /^(.+)\.(jpe?g|png|webp)$/i.exec(fileName);
+    if (!singleImage) {
       return null;
     }
 
-    return { sku: match[1], sequence };
+    return { sku: singleImage[1], sequence: 1 };
   }
 
   private getMimeTypeFromFileName(fileName: string): string {
