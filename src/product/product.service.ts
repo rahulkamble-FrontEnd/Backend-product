@@ -830,22 +830,22 @@ export class ProductService {
     return { ids, missingIds, products: normalized, fields: visibleFields };
   }
 
-  async softDeleteProduct(productId: string): Promise<{ message: string }> {
+  async deleteProductPermanently(
+    productId: string,
+  ): Promise<{ message: string }> {
     const product = await this.productRepository.findOne({
       where: { id: productId },
       withDeleted: true,
-      select: ['id', 'deletedAt'],
+      select: ['id'],
     });
     if (!product) {
       throw new NotFoundException(`Product with id "${productId}" not found`);
     }
 
-    if (product.deletedAt) {
-      return { message: `Product with id "${productId}" is already deleted` };
-    }
-
-    await this.productRepository.softDelete(productId);
-    return { message: `Product with id "${productId}" has been deleted` };
+    await this.productRepository.delete(productId);
+    return {
+      message: `Product with id "${productId}" has been permanently deleted`,
+    };
   }
 
   async removeProductImage(

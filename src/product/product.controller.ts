@@ -374,6 +374,6 @@ export class ProductController {
   async remove(
     @Param('id', ParseUUIDPipe) productId: string,
   ): Promise<{ message: string }> {
-    return this.productService.softDeleteProduct(productId);
+    return this.productService.deleteProductPermanently(productId);
   }
 }
