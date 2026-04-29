@@ -183,7 +183,7 @@ export class ProductController {
     createdCount: number;
     failedCount: number;
     created: Array<{ row: number; id: string; sku: string; name: string }>;
-    errors: Array<{ row: number; message: string }>;
+    errors: Array<{ row: number; sku?: string; message: string }>;
   }> {
     const file = filesByField?.file?.[0];
     const imagesZip = filesByField?.imagesZip?.[0];
