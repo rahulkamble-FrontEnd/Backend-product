@@ -31,7 +31,7 @@ export class User {
   // User roles for permissions
   @Column({
     type: 'enum',
-    enum: ['customer', 'designer', 'admin', 'blogadmin'],
+    enum: ['customer', 'designer', 'admin', 'blogadmin', 'dataadmin'],
     nullable: false,
   })
   role: string;
