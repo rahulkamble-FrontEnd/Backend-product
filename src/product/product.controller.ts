@@ -98,7 +98,7 @@ export class ProductController {
   // Admin: Create a new product
   // ─────────────────────────────────────────────
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post()
   async create(
     @Body() createProductDto: CreateProductDto,
@@ -108,7 +108,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post('bulk-upload')
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -217,7 +217,7 @@ export class ProductController {
   // Admin: Upload an image for a product → S3
   // ─────────────────────────────────────────────
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post(':id/images')
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -273,7 +273,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post(':id/categories')
   async linkCategories(
     @Param('id', ParseUUIDPipe) productId: string,
@@ -283,7 +283,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post(':id/subcategories')
   async linkSubcategories(
     @Param('id', ParseUUIDPipe) productId: string,
@@ -313,7 +313,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Get(':id/tags')
   async getLinkedTags(@Param('id', ParseUUIDPipe) productId: string): Promise<
     Array<{
@@ -329,7 +329,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post(':id/tags')
   async linkTag(
     @Param('id', ParseUUIDPipe) productId: string,
@@ -339,7 +339,7 @@ export class ProductController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Delete(':id/tags/:tagId')
   async unlinkTag(
     @Param('id', ParseUUIDPipe) productId: string,
