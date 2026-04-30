@@ -5,9 +5,11 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  RelationId,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../user/user.entity';
+import { Category } from '../category/category.entity';
 
 @Entity('blog_posts')
 export class BlogPost {
@@ -20,13 +22,12 @@ export class BlogPost {
   @Column({ type: 'varchar', length: 270, unique: true, nullable: false })
   slug: string;
 
-  @Column({
-    name: 'category_tag',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-  })
-  categoryTag: string | null;
+  @ManyToOne(() => Category, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'category_id' })
+  category: Category | null;
+
+  @RelationId((blogPost: BlogPost) => blogPost.category)
+  categoryId: string | null;
 
   @Column({
     name: 'featured_image_s3_key',

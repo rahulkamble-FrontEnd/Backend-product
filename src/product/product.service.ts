@@ -842,7 +842,7 @@ export class ProductService {
       where: { slug },
       relations: {
         images: true,
-        productCategories: { category: true },
+        productCategories: { category: { parent: true } },
       },
     });
     if (!product) {
@@ -895,6 +895,9 @@ export class ProductService {
         categoryId: pc.categoryId,
         name: pc.category?.name,
         slug: pc.category?.slug,
+        parentId: pc.category?.parent?.id ?? null,
+        parentSlug: pc.category?.parent?.slug ?? null,
+        parentName: pc.category?.parent?.name ?? null,
         type: pc.category?.type,
         displayOrder: pc.category?.displayOrder,
         isActive: pc.category?.isActive,

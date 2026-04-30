@@ -18,6 +18,7 @@ import { Trending } from '../trending/trending.entity';
 import { CreateTrendingDto } from './dto/create-trending.dto';
 import { S3Service } from '../common/services/s3.service';
 import { User } from '../user/user.entity';
+import { Category } from '../category/category.entity';
 
 @Injectable()
 export class BlogService {
@@ -30,12 +31,15 @@ export class BlogService {
     private readonly portfolioImageRepository: Repository<PortfolioImage>,
     @InjectRepository(Trending)
     private readonly trendingRepository: Repository<Trending>,
+    @InjectRepository(Category)
+    private readonly categoryRepository: Repository<Category>,
     private readonly s3Service: S3Service,
   ) {}
 
   async listPublished(): Promise<BlogPost[]> {
     return this.blogPostRepository.find({
       where: { status: 'published' },
+      relations: ['category'],
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
     });
   }
@@ -43,6 +47,7 @@ export class BlogService {
   async getPublishedBySlug(slug: string): Promise<BlogPost> {
     const post = await this.blogPostRepository.findOne({
       where: { slug, status: 'published' },
+      relations: ['category'],
     });
     if (!post) {
       throw new NotFoundException(
@@ -77,11 +82,23 @@ export class BlogService {
       );
     }
 
+    let category: Category | null = null;
+    if (dto.categoryId) {
+      category = await this.categoryRepository.findOne({
+        where: { id: dto.categoryId, isActive: true },
+      });
+      if (!category) {
+        throw new BadRequestException(
+          `Category "${dto.categoryId}" is invalid or inactive`,
+        );
+      }
+    }
+
     const entity = this.blogPostRepository.create({
       title: dto.title,
       slug: dto.slug,
       body: dto.body,
-      categoryTag: dto.categoryTag ?? null,
+      category,
       featuredImageS3Key,
       status: dto.status ?? 'draft',
       publishedAt: dto.status === 'published' ? new Date() : null,
@@ -94,6 +111,7 @@ export class BlogService {
   async publish(postId: string, dto: PublishBlogPostDto): Promise<BlogPost> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
+      relations: ['category'],
     });
     if (!post) {
       throw new NotFoundException(`Blog post with id "${postId}" not found`);
@@ -125,7 +143,21 @@ export class BlogService {
     if (dto.title !== undefined) post.title = dto.title;
     if (dto.slug !== undefined) post.slug = dto.slug;
     if (dto.body !== undefined) post.body = dto.body;
-    if (dto.categoryTag !== undefined) post.categoryTag = dto.categoryTag;
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId) {
+        const category = await this.categoryRepository.findOne({
+          where: { id: dto.categoryId, isActive: true },
+        });
+        if (!category) {
+          throw new BadRequestException(
+            `Category "${dto.categoryId}" is invalid or inactive`,
+          );
+        }
+        post.category = category;
+      } else {
+        post.category = null;
+      }
+    }
     if (dto.featuredImageS3Key !== undefined) {
       post.featuredImageS3Key = dto.featuredImageS3Key;
     }
@@ -167,6 +199,36 @@ export class BlogService {
 
     await this.blogPostRepository.delete({ id: postId });
     return { message: `Blog post "${postId}" deleted successfully` };
+  }
+
+  async listRelevantBySlug(slug: string, limit = 3): Promise<BlogPost[]> {
+    const sourcePost = await this.blogPostRepository.findOne({
+      where: { slug, status: 'published' },
+      relations: ['category'],
+    });
+    if (!sourcePost) {
+      throw new NotFoundException(
+        `Published blog post with slug "${slug}" not found`,
+      );
+    }
+
+    const sourceCategoryId = sourcePost.categoryId;
+    if (!sourceCategoryId) {
+      return [];
+    }
+
+    return this.blogPostRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.category', 'category')
+      .where('blog.status = :status', { status: 'published' })
+      .andWhere('blog.slug != :slug', { slug })
+      .andWhere('blog.category_id = :categoryId', {
+        categoryId: sourceCategoryId,
+      })
+      .orderBy('blog.publishedAt', 'DESC')
+      .addOrderBy('blog.createdAt', 'DESC')
+      .take(Math.min(Math.max(limit, 1), 12))
+      .getMany();
   }
 
   async createPortfolio(
