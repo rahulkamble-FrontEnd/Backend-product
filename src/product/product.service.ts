@@ -908,6 +908,97 @@ export class ProductService {
     return item;
   }
 
+  async getSimilarProductsByTags(
+    productId: string,
+    requesterRole?: string,
+    limit = 24,
+  ): Promise<unknown[]> {
+    const hideBrand = requesterRole === UserRole.CUSTOMER;
+    const safeLimit = Math.min(Math.max(Math.floor(limit || 24), 1), 50);
+
+    const currentProduct = await this.productRepository.findOne({
+      where: { id: productId },
+      select: { id: true },
+    });
+    if (!currentProduct) {
+      throw new NotFoundException(`Product with id "${productId}" not found`);
+    }
+
+    const linkedTags = await this.productTagRepository.find({
+      where: { productId },
+      select: { tagId: true },
+    });
+    const tagIds = Array.from(
+      new Set(linkedTags.map((item) => item.tagId?.trim()).filter(Boolean)),
+    );
+    if (tagIds.length === 0) {
+      return [];
+    }
+
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .innerJoin('product.productTags', 'productTag')
+      .leftJoinAndSelect('product.images', 'image')
+      .where('productTag.tagId IN (:...tagIds)', { tagIds })
+      .andWhere('product.id != :productId', { productId })
+      .andWhere('product.status = :status', { status: 'active' })
+      .distinct(true)
+      .orderBy('product.createdAt', 'DESC')
+      .take(safeLimit)
+      .getMany();
+
+    return products.map((p) => {
+      const images = [...(p.images ?? [])].sort((a, b) => {
+        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+        if (a.displayOrder !== b.displayOrder)
+          return a.displayOrder - b.displayOrder;
+        return a.createdAt.getTime() - b.createdAt.getTime();
+      });
+
+      const item: Record<string, unknown> = {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        sku: p.sku,
+        imsId: p.imsId,
+        description: p.description,
+        bookName: p.bookName,
+        pageNumber: p.pageNumber,
+        application: p.application,
+        materialType: p.materialType,
+        finishType: p.finishType,
+        colorName: p.colorName,
+        colorHex: p.colorHex,
+        thickness: p.thickness,
+        dimensions: p.dimensions,
+        performanceRating: p.performanceRating,
+        durabilityRating: p.durabilityRating,
+        priceCategory: p.priceCategory,
+        maintenanceRating: p.maintenanceRating,
+        bestUsedFor: p.bestUsedFor,
+        pros: p.pros,
+        cons: p.cons,
+        status: p.status,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        images: images.map((img) => ({
+          id: img.id,
+          s3Key: img.s3Key,
+          url: this.s3Service.getPublicUrl(img.s3Key),
+          displayOrder: img.displayOrder,
+          isPrimary: img.isPrimary,
+          createdAt: img.createdAt,
+        })),
+      };
+
+      if (!hideBrand) {
+        item.brand = p.brand;
+      }
+
+      return item;
+    });
+  }
+
   async compareProducts(
     idsParam: string,
     requesterRole?: string,
