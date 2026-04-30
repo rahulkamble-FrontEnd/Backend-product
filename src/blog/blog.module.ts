@@ -7,10 +7,17 @@ import { Portfolio } from '../portfolio/portfolio.entity';
 import { PortfolioImage } from '../portfolio/portfolio-image.entity';
 import { Trending } from '../trending/trending.entity';
 import { S3Service } from '../common/services/s3.service';
+import { Category } from '../category/category.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BlogPost, Portfolio, PortfolioImage, Trending]),
+    TypeOrmModule.forFeature([
+      BlogPost,
+      Portfolio,
+      PortfolioImage,
+      Trending,
+      Category,
+    ]),
   ],
   controllers: [BlogController],
   providers: [BlogService, S3Service],

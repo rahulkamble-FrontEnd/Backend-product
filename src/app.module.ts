@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config'; // 👈 add ConfigService here
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +14,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { TrendingModule } from './trending/trending.module';
 import { TagsModule } from './tags/tags.module';
 import { DesignCfModule } from './design-cf/design-cf.module';
+import { DbTransientRetryInterceptor } from './common/interceptors/db-transient-retry.interceptor';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { DesignCfModule } from './design-cf/design-cf.module';
         extra: {
           // Keep connections stable across idle/network blips.
           connectionLimit: 10,
+          waitForConnections: true,
+          queueLimit: 0,
           connectTimeout: 30000,
           enableKeepAlive: true,
           keepAliveInitialDelay: 10000,
@@ -71,6 +75,11 @@ import { DesignCfModule } from './design-cf/design-cf.module';
     DesignCfModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DbTransientRetryInterceptor,
+    },
+  ],
 })
 export class AppModule {}
