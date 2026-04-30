@@ -93,6 +93,22 @@ export class ProductController {
     return this.productService.getProductBySlug(slug, req.user?.role);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get(':id/similar')
+  async getSimilarByTags(
+    @Param('id', ParseUUIDPipe) productId: string,
+    @Query('limit') limitRaw: string | undefined,
+    @Req() req: OptionalAuthenticatedRequest,
+  ): Promise<unknown[]> {
+    const parsedLimit = Number(limitRaw);
+    const limit = Number.isFinite(parsedLimit) ? parsedLimit : 24;
+    return this.productService.getSimilarProductsByTags(
+      productId,
+      req.user?.role,
+      limit,
+    );
+  }
+
   // ─────────────────────────────────────────────
   // POST /products
   // Admin: Create a new product
