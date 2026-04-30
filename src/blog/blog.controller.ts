@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -38,6 +39,16 @@ export class BlogController {
   @Get()
   async listPublished() {
     return this.blogService.listPublished();
+  }
+
+  @Get(':slug/relevant')
+  async getRelevantBySlug(
+    @Param('slug') slug: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = Number.parseInt(limit ?? '', 10);
+    const safeLimit = Number.isNaN(parsedLimit) ? 3 : parsedLimit;
+    return this.blogService.listRelevantBySlug(slug, safeLimit);
   }
 
   @Get(':slug')

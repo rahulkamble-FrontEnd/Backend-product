@@ -1,4 +1,5 @@
 import {
+  IsUUID,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -21,10 +22,9 @@ export class CreateBlogPostDto {
   @IsNotEmpty()
   body: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
-  @MaxLength(100)
-  categoryTag?: string;
+  categoryId?: string;
 
   @IsString()
   @IsOptional()

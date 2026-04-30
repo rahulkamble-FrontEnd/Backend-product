@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class UpdateBlogPostDto {
   @IsString()
@@ -15,10 +15,9 @@ export class UpdateBlogPostDto {
   @IsOptional()
   body?: string;
 
-  @IsString()
+  @IsUUID()
   @IsOptional()
-  @MaxLength(100)
-  categoryTag?: string;
+  categoryId?: string;
 
   @IsString()
   @IsOptional()
