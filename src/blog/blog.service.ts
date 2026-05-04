@@ -57,6 +57,74 @@ export class BlogService {
     return post;
   }
 
+  /**
+   * Public post at /blog/{categorySlug}/{postSlug} — category must match the post.
+   */
+  async getPublishedByCategoryAndSlug(
+    categorySlug: string,
+    postSlug: string,
+  ): Promise<BlogPost> {
+    const post = await this.blogPostRepository.findOne({
+      where: { slug: postSlug, status: 'published' },
+      relations: ['category'],
+    });
+    if (!post) {
+      throw new NotFoundException(
+        `Published blog post with slug "${postSlug}" not found`,
+      );
+    }
+    if (!post.category) {
+      throw new NotFoundException(
+        `Blog "${postSlug}" has no category — use the legacy URL without category segment`,
+      );
+    }
+    if (post.category.slug !== categorySlug) {
+      throw new NotFoundException(
+        `Blog not found at category "${categorySlug}"`,
+      );
+    }
+    return post;
+  }
+
+  async uploadBodyImage(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<{ url: string; key: string }> {
+    const fileExt = extname(file.originalname).toLowerCase();
+    const s3Key = `products/blog/${userId}/body/${uuidv4()}${fileExt}`;
+    const key = await this.s3Service.uploadFile(
+      s3Key,
+      file.buffer,
+      file.mimetype,
+    );
+    return { key, url: this.s3Service.getPublicUrl(key) };
+  }
+
+  /**
+   * Returns whether a slug is free to use. When updating, pass excludePostId so the
+   * current post's slug is still considered available.
+   */
+  async isSlugAvailable(
+    slug: string,
+    excludePostId?: string,
+  ): Promise<{ available: boolean }> {
+    const trimmed = slug?.trim() ?? '';
+    if (!trimmed) {
+      return { available: false };
+    }
+    const existing = await this.blogPostRepository.findOne({
+      where: { slug: trimmed },
+      select: ['id', 'slug'],
+    });
+    if (!existing) {
+      return { available: true };
+    }
+    if (excludePostId && existing.id === excludePostId) {
+      return { available: true };
+    }
+    return { available: false };
+  }
+
   async createDraft(
     dto: CreateBlogPostDto,
     userId: string,
@@ -100,6 +168,10 @@ export class BlogService {
       body: dto.body,
       category,
       featuredImageS3Key,
+      featuredImageAlt: dto.featuredImageAlt?.trim() ?? null,
+      featuredImageTitle: dto.featuredImageTitle?.trim() ?? null,
+      metaDescription: dto.metaDescription?.trim() ?? null,
+      seoKeyword: dto.seoKeyword?.trim() ?? null,
       status: dto.status ?? 'draft',
       publishedAt: dto.status === 'published' ? new Date() : null,
       author: { id: userId } as User,
@@ -135,7 +207,7 @@ export class BlogService {
         where: { slug: dto.slug },
         select: ['id', 'slug'],
       });
-      if (existingSlug) {
+      if (existingSlug && existingSlug.id !== postId) {
         throw new BadRequestException(`Slug "${dto.slug}" already exists`);
       }
     }
@@ -160,6 +232,18 @@ export class BlogService {
     }
     if (dto.featuredImageS3Key !== undefined) {
       post.featuredImageS3Key = dto.featuredImageS3Key;
+    }
+    if (dto.featuredImageAlt !== undefined) {
+      post.featuredImageAlt = dto.featuredImageAlt?.trim() ?? null;
+    }
+    if (dto.featuredImageTitle !== undefined) {
+      post.featuredImageTitle = dto.featuredImageTitle?.trim() ?? null;
+    }
+    if (dto.metaDescription !== undefined) {
+      post.metaDescription = dto.metaDescription?.trim() ?? null;
+    }
+    if (dto.seoKeyword !== undefined) {
+      post.seoKeyword = dto.seoKeyword?.trim() ?? null;
     }
     if (dto.status !== undefined) {
       post.status = dto.status;

@@ -24,6 +24,26 @@ export class UpdateBlogPostDto {
   @MaxLength(500)
   featuredImageS3Key?: string;
 
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  featuredImageAlt?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  featuredImageTitle?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(320)
+  metaDescription?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(120)
+  seoKeyword?: string;
+
   @IsIn(['draft', 'published'])
   @IsOptional()
   status?: string;

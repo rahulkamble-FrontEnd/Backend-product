@@ -37,6 +37,38 @@ export class BlogPost {
   })
   featuredImageS3Key: string | null;
 
+  @Column({
+    name: 'featured_image_alt',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  featuredImageAlt: string | null;
+
+  @Column({
+    name: 'featured_image_title',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  featuredImageTitle: string | null;
+
+  @Column({
+    name: 'meta_description',
+    type: 'varchar',
+    length: 320,
+    nullable: true,
+  })
+  metaDescription: string | null;
+
+  @Column({
+    name: 'seo_keyword',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
+  seoKeyword: string | null;
+
   @Column({ type: 'longtext', nullable: false })
   body: string;
 
