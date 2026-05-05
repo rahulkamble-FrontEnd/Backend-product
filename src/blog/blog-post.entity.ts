@@ -54,6 +54,14 @@ export class BlogPost {
   featuredImageTitle: string | null;
 
   @Column({
+    name: 'social_image_s3_key',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  socialImageS3Key: string | null;
+
+  @Column({
     name: 'meta_description',
     type: 'varchar',
     length: 320,

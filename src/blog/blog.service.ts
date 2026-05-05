@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import { BlogPost } from './blog-post.entity';
@@ -33,28 +33,77 @@ export class BlogService {
     private readonly trendingRepository: Repository<Trending>,
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly s3Service: S3Service,
   ) {}
 
-  async listPublished(): Promise<BlogPost[]> {
-    return this.blogPostRepository.find({
-      where: { status: 'published' },
-      relations: ['category'],
-      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+  private async attachAuthorSummary<T extends { author?: unknown } & BlogPost>(
+    posts: T[],
+  ): Promise<Array<T & { author: { id: string; name: string } | null }>> {
+    if (!posts.length) return posts.map((post) => ({ ...post, author: null }));
+    const authorIds = Array.from(
+      new Set(
+        posts
+          .map((post) => post.author?.['id'] ?? null)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    if (!authorIds.length) {
+      return posts.map((post) => ({ ...post, author: null }));
+    }
+    const authors = await this.userRepository.find({
+      where: { id: In(authorIds) },
+      select: ['id', 'name'],
+    });
+    const byId = new Map(authors.map((author) => [author.id, author]));
+    return posts.map((post) => {
+      const authorId = post.author?.['id'] ?? null;
+      const author = authorId ? byId.get(authorId) : null;
+      return {
+        ...post,
+        author: author ? { id: author.id, name: author.name } : null,
+      };
     });
   }
 
-  async getPublishedBySlug(slug: string): Promise<BlogPost> {
+  async listPublished(): Promise<Array<BlogPost & { author: { id: string; name: string } | null }>> {
+    const now = new Date();
+    const posts = await this.blogPostRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.category', 'category')
+      .leftJoinAndSelect('blog.author', 'author')
+      .where('blog.status = :status', { status: 'published' })
+      .andWhere('(blog.publishedAt IS NULL OR blog.publishedAt <= :now)', {
+        now,
+      })
+      .orderBy('blog.publishedAt', 'DESC')
+      .addOrderBy('blog.createdAt', 'DESC')
+      .getMany();
+    return this.attachAuthorSummary(posts);
+  }
+
+  async getPublishedBySlug(slug: string): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+    const now = new Date();
     const post = await this.blogPostRepository.findOne({
-      where: { slug, status: 'published' },
-      relations: ['category'],
+      where: {
+        slug,
+        status: 'published',
+      },
+      relations: ['category', 'author'],
     });
     if (!post) {
       throw new NotFoundException(
         `Published blog post with slug "${slug}" not found`,
       );
     }
-    return post;
+    if (post.publishedAt && post.publishedAt > now) {
+      throw new NotFoundException(
+        `Published blog post with slug "${slug}" not found`,
+      );
+    }
+    const [enriched] = await this.attachAuthorSummary([post]);
+    return enriched;
   }
 
   /**
@@ -63,12 +112,18 @@ export class BlogService {
   async getPublishedByCategoryAndSlug(
     categorySlug: string,
     postSlug: string,
-  ): Promise<BlogPost> {
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+    const now = new Date();
     const post = await this.blogPostRepository.findOne({
       where: { slug: postSlug, status: 'published' },
-      relations: ['category'],
+      relations: ['category', 'author'],
     });
     if (!post) {
+      throw new NotFoundException(
+        `Published blog post with slug "${postSlug}" not found`,
+      );
+    }
+    if (post.publishedAt && post.publishedAt > now) {
       throw new NotFoundException(
         `Published blog post with slug "${postSlug}" not found`,
       );
@@ -83,7 +138,8 @@ export class BlogService {
         `Blog not found at category "${categorySlug}"`,
       );
     }
-    return post;
+    const [enriched] = await this.attachAuthorSummary([post]);
+    return enriched;
   }
 
   async uploadBodyImage(
@@ -129,7 +185,7 @@ export class BlogService {
     dto: CreateBlogPostDto,
     userId: string,
     featuredImage?: Express.Multer.File,
-  ): Promise<BlogPost> {
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const existingSlug = await this.blogPostRepository.findOne({
       where: { slug: dto.slug },
       select: ['id', 'slug'],
@@ -170,17 +226,30 @@ export class BlogService {
       featuredImageS3Key,
       featuredImageAlt: dto.featuredImageAlt?.trim() ?? null,
       featuredImageTitle: dto.featuredImageTitle?.trim() ?? null,
+      socialImageS3Key: dto.socialImageS3Key?.trim() ?? null,
       metaDescription: dto.metaDescription?.trim() ?? null,
       seoKeyword: dto.seoKeyword?.trim() ?? null,
       status: dto.status ?? 'draft',
-      publishedAt: dto.status === 'published' ? new Date() : null,
+      publishedAt:
+        dto.status === 'published'
+          ? (dto.publishedAt ? new Date(dto.publishedAt) : new Date())
+          : null,
       author: { id: userId } as User,
     });
 
-    return this.blogPostRepository.save(entity);
+    await this.blogPostRepository.save(entity);
+    const saved = await this.blogPostRepository.findOne({
+      where: { id: entity.id },
+      relations: ['category', 'author'],
+    });
+    if (!saved) {
+      throw new NotFoundException(`Blog post with id "${entity.id}" not found`);
+    }
+    const [enriched] = await this.attachAuthorSummary([saved]);
+    return enriched;
   }
 
-  async publish(postId: string, dto: PublishBlogPostDto): Promise<BlogPost> {
+  async publish(postId: string, dto: PublishBlogPostDto): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
       relations: ['category'],
@@ -191,10 +260,19 @@ export class BlogService {
 
     post.status = 'published';
     post.publishedAt = dto.publishedAt ? new Date(dto.publishedAt) : new Date();
-    return this.blogPostRepository.save(post);
+    await this.blogPostRepository.save(post);
+    const saved = await this.blogPostRepository.findOne({
+      where: { id: post.id },
+      relations: ['category', 'author'],
+    });
+    if (!saved) {
+      throw new NotFoundException(`Blog post with id "${post.id}" not found`);
+    }
+    const [enriched] = await this.attachAuthorSummary([saved]);
+    return enriched;
   }
 
-  async update(postId: string, dto: UpdateBlogPostDto): Promise<BlogPost> {
+  async update(postId: string, dto: UpdateBlogPostDto): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
     });
@@ -239,6 +317,9 @@ export class BlogService {
     if (dto.featuredImageTitle !== undefined) {
       post.featuredImageTitle = dto.featuredImageTitle?.trim() ?? null;
     }
+    if (dto.socialImageS3Key !== undefined) {
+      post.socialImageS3Key = dto.socialImageS3Key?.trim() ?? null;
+    }
     if (dto.metaDescription !== undefined) {
       post.metaDescription = dto.metaDescription?.trim() ?? null;
     }
@@ -247,14 +328,30 @@ export class BlogService {
     }
     if (dto.status !== undefined) {
       post.status = dto.status;
-      post.publishedAt =
-        dto.status === 'published' ? (post.publishedAt ?? new Date()) : null;
+      if (dto.status === 'published') {
+        post.publishedAt = dto.publishedAt
+          ? new Date(dto.publishedAt)
+          : (post.publishedAt ?? new Date());
+      } else {
+        post.publishedAt = null;
+      }
+    } else if (dto.publishedAt !== undefined && post.status === 'published') {
+      post.publishedAt = dto.publishedAt ? new Date(dto.publishedAt) : null;
     }
 
-    return this.blogPostRepository.save(post);
+    await this.blogPostRepository.save(post);
+    const saved = await this.blogPostRepository.findOne({
+      where: { id: post.id },
+      relations: ['category', 'author'],
+    });
+    if (!saved) {
+      throw new NotFoundException(`Blog post with id "${post.id}" not found`);
+    }
+    const [enriched] = await this.attachAuthorSummary([saved]);
+    return enriched;
   }
 
-  async togglePublished(postId: string): Promise<BlogPost> {
+  async togglePublished(postId: string): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
     });
@@ -270,7 +367,16 @@ export class BlogService {
       post.publishedAt = new Date();
     }
 
-    return this.blogPostRepository.save(post);
+    await this.blogPostRepository.save(post);
+    const saved = await this.blogPostRepository.findOne({
+      where: { id: post.id },
+      relations: ['category', 'author'],
+    });
+    if (!saved) {
+      throw new NotFoundException(`Blog post with id "${post.id}" not found`);
+    }
+    const [enriched] = await this.attachAuthorSummary([saved]);
+    return enriched;
   }
 
   async remove(postId: string): Promise<{ message: string }> {
@@ -285,12 +391,18 @@ export class BlogService {
     return { message: `Blog post "${postId}" deleted successfully` };
   }
 
-  async listRelevantBySlug(slug: string, limit = 3): Promise<BlogPost[]> {
+  async listRelevantBySlug(slug: string, limit = 3): Promise<Array<BlogPost & { author: { id: string; name: string } | null }>> {
+    const now = new Date();
     const sourcePost = await this.blogPostRepository.findOne({
       where: { slug, status: 'published' },
       relations: ['category'],
     });
     if (!sourcePost) {
+      throw new NotFoundException(
+        `Published blog post with slug "${slug}" not found`,
+      );
+    }
+    if (sourcePost.publishedAt && sourcePost.publishedAt > now) {
       throw new NotFoundException(
         `Published blog post with slug "${slug}" not found`,
       );
@@ -301,10 +413,14 @@ export class BlogService {
       return [];
     }
 
-    return this.blogPostRepository
+    const related = await this.blogPostRepository
       .createQueryBuilder('blog')
       .leftJoinAndSelect('blog.category', 'category')
+      .leftJoinAndSelect('blog.author', 'author')
       .where('blog.status = :status', { status: 'published' })
+      .andWhere('(blog.publishedAt IS NULL OR blog.publishedAt <= :now)', {
+        now,
+      })
       .andWhere('blog.slug != :slug', { slug })
       .andWhere('blog.category_id = :categoryId', {
         categoryId: sourceCategoryId,
@@ -313,6 +429,7 @@ export class BlogService {
       .addOrderBy('blog.createdAt', 'DESC')
       .take(Math.min(Math.max(limit, 1), 12))
       .getMany();
+    return this.attachAuthorSummary(related);
   }
 
   async createPortfolio(

@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsUUID,
   IsIn,
   IsNotEmpty,
@@ -43,6 +44,11 @@ export class CreateBlogPostDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
+  socialImageS3Key?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(320)
   metaDescription?: string;
 
@@ -54,4 +60,8 @@ export class CreateBlogPostDto {
   @IsIn(['draft', 'published'])
   @IsOptional()
   status?: string;
+
+  @IsDateString()
+  @IsOptional()
+  publishedAt?: string;
 }

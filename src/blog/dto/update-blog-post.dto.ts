@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class UpdateBlogPostDto {
   @IsString()
@@ -36,6 +36,11 @@ export class UpdateBlogPostDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
+  socialImageS3Key?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(320)
   metaDescription?: string;
 
@@ -47,4 +52,8 @@ export class UpdateBlogPostDto {
   @IsIn(['draft', 'published'])
   @IsOptional()
   status?: string;
+
+  @IsDateString()
+  @IsOptional()
+  publishedAt?: string;
 }
