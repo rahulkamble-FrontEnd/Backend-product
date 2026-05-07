@@ -62,6 +62,14 @@ export class BlogPost {
   socialImageS3Key: string | null;
 
   @Column({
+    name: 'meta_title',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  metaTitle: string | null;
+
+  @Column({
     name: 'meta_description',
     type: 'varchar',
     length: 320,
@@ -76,6 +84,30 @@ export class BlogPost {
     nullable: true,
   })
   seoKeyword: string | null;
+
+  @Column({
+    name: 'secondary_keywords',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  secondaryKeywords: string | null;
+
+  @Column({
+    name: 'canonical_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  canonicalUrl: string | null;
+
+  @Column({
+    name: 'meta_robots',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  metaRobots: string | null;
 
   @Column({ type: 'longtext', nullable: false })
   body: string;

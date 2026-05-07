@@ -1,4 +1,11 @@
-import { IsDateString, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateBlogPostDto {
   @IsString()
@@ -41,6 +48,11 @@ export class UpdateBlogPostDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
+  metaTitle?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(320)
   metaDescription?: string;
 
@@ -48,6 +60,20 @@ export class UpdateBlogPostDto {
   @IsOptional()
   @MaxLength(120)
   seoKeyword?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  secondaryKeywords?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  canonicalUrl?: string;
+
+  @IsIn(['index', 'noindex'])
+  @IsOptional()
+  metaRobots?: string;
 
   @IsIn(['draft', 'published'])
   @IsOptional()

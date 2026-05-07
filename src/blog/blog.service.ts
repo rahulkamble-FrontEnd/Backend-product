@@ -67,7 +67,9 @@ export class BlogService {
     });
   }
 
-  async listPublished(): Promise<Array<BlogPost & { author: { id: string; name: string } | null }>> {
+  async listPublished(): Promise<
+    Array<BlogPost & { author: { id: string; name: string } | null }>
+  > {
     const now = new Date();
     const posts = await this.blogPostRepository
       .createQueryBuilder('blog')
@@ -83,7 +85,9 @@ export class BlogService {
     return this.attachAuthorSummary(posts);
   }
 
-  async getPublishedBySlug(slug: string): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+  async getPublishedBySlug(
+    slug: string,
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const now = new Date();
     const post = await this.blogPostRepository.findOne({
       where: {
@@ -227,12 +231,18 @@ export class BlogService {
       featuredImageAlt: dto.featuredImageAlt?.trim() ?? null,
       featuredImageTitle: dto.featuredImageTitle?.trim() ?? null,
       socialImageS3Key: dto.socialImageS3Key?.trim() ?? null,
+      metaTitle: dto.metaTitle?.trim() ?? null,
       metaDescription: dto.metaDescription?.trim() ?? null,
       seoKeyword: dto.seoKeyword?.trim() ?? null,
+      secondaryKeywords: dto.secondaryKeywords?.trim() ?? null,
+      canonicalUrl: dto.canonicalUrl?.trim() ?? null,
+      metaRobots: dto.metaRobots?.trim() ?? null,
       status: dto.status ?? 'draft',
       publishedAt:
         dto.status === 'published'
-          ? (dto.publishedAt ? new Date(dto.publishedAt) : new Date())
+          ? dto.publishedAt
+            ? new Date(dto.publishedAt)
+            : new Date()
           : null,
       author: { id: userId } as User,
     });
@@ -249,7 +259,10 @@ export class BlogService {
     return enriched;
   }
 
-  async publish(postId: string, dto: PublishBlogPostDto): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+  async publish(
+    postId: string,
+    dto: PublishBlogPostDto,
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
       relations: ['category'],
@@ -272,7 +285,10 @@ export class BlogService {
     return enriched;
   }
 
-  async update(postId: string, dto: UpdateBlogPostDto): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+  async update(
+    postId: string,
+    dto: UpdateBlogPostDto,
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
     });
@@ -320,11 +336,23 @@ export class BlogService {
     if (dto.socialImageS3Key !== undefined) {
       post.socialImageS3Key = dto.socialImageS3Key?.trim() ?? null;
     }
+    if (dto.metaTitle !== undefined) {
+      post.metaTitle = dto.metaTitle?.trim() ?? null;
+    }
     if (dto.metaDescription !== undefined) {
       post.metaDescription = dto.metaDescription?.trim() ?? null;
     }
     if (dto.seoKeyword !== undefined) {
       post.seoKeyword = dto.seoKeyword?.trim() ?? null;
+    }
+    if (dto.secondaryKeywords !== undefined) {
+      post.secondaryKeywords = dto.secondaryKeywords?.trim() ?? null;
+    }
+    if (dto.canonicalUrl !== undefined) {
+      post.canonicalUrl = dto.canonicalUrl?.trim() ?? null;
+    }
+    if (dto.metaRobots !== undefined) {
+      post.metaRobots = dto.metaRobots?.trim() ?? null;
     }
     if (dto.status !== undefined) {
       post.status = dto.status;
@@ -351,7 +379,9 @@ export class BlogService {
     return enriched;
   }
 
-  async togglePublished(postId: string): Promise<BlogPost & { author: { id: string; name: string } | null }> {
+  async togglePublished(
+    postId: string,
+  ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
     });
@@ -391,7 +421,12 @@ export class BlogService {
     return { message: `Blog post "${postId}" deleted successfully` };
   }
 
-  async listRelevantBySlug(slug: string, limit = 3): Promise<Array<BlogPost & { author: { id: string; name: string } | null }>> {
+  async listRelevantBySlug(
+    slug: string,
+    limit = 3,
+  ): Promise<
+    Array<BlogPost & { author: { id: string; name: string } | null }>
+  > {
     const now = new Date();
     const sourcePost = await this.blogPostRepository.findOne({
       where: { slug, status: 'published' },

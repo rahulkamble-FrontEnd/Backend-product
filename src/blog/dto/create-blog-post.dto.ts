@@ -49,6 +49,11 @@ export class CreateBlogPostDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(255)
+  metaTitle?: string;
+
+  @IsString()
+  @IsOptional()
   @MaxLength(320)
   metaDescription?: string;
 
@@ -56,6 +61,20 @@ export class CreateBlogPostDto {
   @IsOptional()
   @MaxLength(120)
   seoKeyword?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  secondaryKeywords?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  canonicalUrl?: string;
+
+  @IsIn(['index', 'noindex'])
+  @IsOptional()
+  metaRobots?: string;
 
   @IsIn(['draft', 'published'])
   @IsOptional()
