@@ -31,6 +31,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { LinkProductTagDto } from './dto/link-product-tag.dto';
+import { BulkUpdateProductsDto } from './dto/bulk-update-products.dto';
 import type {
   AuthenticatedRequest,
   OptionalAuthenticatedRequest,
@@ -216,6 +217,15 @@ export class ProductController {
     }
 
     return this.productService.bulkCreateFromXlsx(file, imagesZip, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
+  @Put('bulk-update')
+  async bulkUpdate(
+    @Body() dto: BulkUpdateProductsDto,
+  ): Promise<{ matchedCount: number; updatedCount: number }> {
+    return this.productService.bulkUpdate(dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
