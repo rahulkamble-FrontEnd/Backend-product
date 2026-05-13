@@ -15,6 +15,7 @@ import { TrendingModule } from './trending/trending.module';
 import { TagsModule } from './tags/tags.module';
 import { DesignCfModule } from './design-cf/design-cf.module';
 import { DbTransientRetryInterceptor } from './common/interceptors/db-transient-retry.interceptor';
+import { SubscribeModule } from './subscribe/subscribe.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { DbTransientRetryInterceptor } from './common/interceptors/db-transient-
     TrendingModule,
     TagsModule,
     DesignCfModule,
+    SubscribeModule,
   ],
   controllers: [AppController],
   providers: [
