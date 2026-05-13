@@ -17,6 +17,7 @@ import { ListProductsQueryDto } from './dto/list-products-query.dto';
 import { S3Service } from '../common/services/s3.service';
 import { Category } from '../category/category.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { BulkUpdateProductsDto } from './dto/bulk-update-products.dto';
 import * as XLSX from 'xlsx';
 import { UserRole } from '../user/dto/create-user.dto';
 import { ProductTag } from './product-tag.entity';
@@ -561,6 +562,62 @@ export class ProductService {
       throw new NotFoundException(`Product with id "${id}" not found`);
     }
     return updated;
+  }
+
+  async bulkUpdate(
+    dto: BulkUpdateProductsDto,
+  ): Promise<{ matchedCount: number; updatedCount: number }> {
+    const productIds = Array.from(
+      new Set((dto.productIds ?? []).map((id) => id.trim()).filter(Boolean)),
+    );
+    if (productIds.length === 0) {
+      throw new BadRequestException('productIds must contain at least one id');
+    }
+
+    const updateData: Partial<Product> = {};
+    if (dto.status !== undefined) {
+      updateData.status = dto.status === 'published' ? 'active' : dto.status;
+    }
+    if (dto.brand !== undefined) updateData.brand = dto.brand.trim();
+    if (dto.materialType !== undefined)
+      updateData.materialType = dto.materialType.trim();
+    if (dto.finishType !== undefined)
+      updateData.finishType = dto.finishType.trim();
+    if (dto.colorName !== undefined)
+      updateData.colorName = dto.colorName.trim();
+    if (dto.thickness !== undefined)
+      updateData.thickness = dto.thickness.trim();
+    if (dto.dimensions !== undefined)
+      updateData.dimensions = dto.dimensions.trim();
+    if (dto.performanceRating !== undefined)
+      updateData.performanceRating = dto.performanceRating;
+    if (dto.durabilityRating !== undefined)
+      updateData.durabilityRating = dto.durabilityRating;
+    if (dto.maintenanceRating !== undefined)
+      updateData.maintenanceRating = dto.maintenanceRating;
+
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException('At least one update field is required');
+    }
+
+    const matchedCount = await this.productRepository.count({
+      where: { id: In(productIds) },
+    });
+    if (matchedCount === 0) {
+      throw new NotFoundException('No matching products found');
+    }
+
+    const result = await this.productRepository
+      .createQueryBuilder()
+      .update(Product)
+      .set(updateData)
+      .where('id IN (:...productIds)', { productIds })
+      .execute();
+
+    return {
+      matchedCount,
+      updatedCount: result.affected ?? 0,
+    };
   }
 
   async listProducts(
