@@ -28,6 +28,7 @@ import { CreatePortfolioDto } from './dto/create-portfolio.dto';
 import { CreateTrendingDto } from './dto/create-trending.dto';
 import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
 import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
+import { validate as isUuid } from 'uuid';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -39,6 +40,36 @@ export class BlogController {
   @Get()
   async listPublished() {
     return this.blogService.listPublished();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
+  @Get('check-slug')
+  async checkSlug(
+    @Query('slug') slug: string,
+    @Query('excludeId') excludeId?: string,
+  ) {
+    if (!slug?.trim()) {
+      throw new BadRequestException('Query parameter "slug" is required');
+    }
+    const trimmedExclude = excludeId?.trim();
+    if (trimmedExclude && !isUuid(trimmedExclude)) {
+      throw new BadRequestException(
+        'Query parameter "excludeId" must be a valid UUID',
+      );
+    }
+    return this.blogService.isSlugAvailable(slug.trim(), trimmedExclude);
+  }
+
+  @Get('by-category/:categorySlug/:postSlug')
+  async getPublishedByPath(
+    @Param('categorySlug') categorySlug: string,
+    @Param('postSlug') postSlug: string,
+  ) {
+    return this.blogService.getPublishedByCategoryAndSlug(
+      categorySlug,
+      postSlug,
+    );
   }
 
   @Get(':slug/relevant')
@@ -85,6 +116,36 @@ export class BlogController {
       throw new BadRequestException('Uploaded featuredImage is empty');
     }
     return this.blogService.createDraft(dto, req.user.id, featuredImage);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
+  @Post('body-image')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Allowed: jpeg, png, webp`,
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadBodyImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    if (!file || file.size === 0) {
+      throw new BadRequestException('Image file is required');
+    }
+    return this.blogService.uploadBodyImage(file, req.user.id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
