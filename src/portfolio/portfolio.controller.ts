@@ -2,7 +2,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -18,6 +22,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../user/dto/create-user.dto';
 import { PortfolioService } from './portfolio.service';
 import { CreatePortfolioEntryDto } from './dto/create-portfolio-entry.dto';
+import { UpdatePortfolioEntryDto } from './dto/update-portfolio-entry.dto';
 import type { AuthenticatedRequest } from '../auth/types/auth-user.type';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -78,5 +83,22 @@ export class PortfolioController {
       );
     }
     return this.portfolioService.createEntry(dto, req.user.id, uploadedFiles);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
+  @Patch(':id')
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePortfolioEntryDto,
+  ) {
+    return this.portfolioService.updateEntry(id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
+  @Delete(':id')
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.portfolioService.removeEntry(id);
   }
 }
