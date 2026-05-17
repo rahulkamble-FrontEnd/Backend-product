@@ -168,11 +168,33 @@ export class BlogController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Put(':id')
+  @UseInterceptors(
+    FileInterceptor('featuredImage', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_SIZE_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Allowed: jpeg, png, webp`,
+            ),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
   async updatePost(
     @Param('id', ParseUUIDPipe) postId: string,
     @Body() dto: UpdateBlogPostDto,
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() featuredImage?: Express.Multer.File,
   ) {
-    return this.blogService.update(postId, dto);
+    if (featuredImage && featuredImage.size === 0) {
+      throw new BadRequestException('Uploaded featuredImage is empty');
+    }
+    return this.blogService.update(postId, dto, req.user.id, featuredImage);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
