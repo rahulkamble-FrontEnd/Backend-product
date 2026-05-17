@@ -85,6 +85,19 @@ export class BlogService {
     return this.attachAuthorSummary(posts);
   }
 
+  async listAllForAdmin(): Promise<
+    Array<BlogPost & { author: { id: string; name: string } | null }>
+  > {
+    const posts = await this.blogPostRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.category', 'category')
+      .leftJoinAndSelect('blog.author', 'author')
+      .orderBy('blog.updatedAt', 'DESC')
+      .addOrderBy('blog.createdAt', 'DESC')
+      .getMany();
+    return this.attachAuthorSummary(posts);
+  }
+
   async getPublishedBySlug(
     slug: string,
   ): Promise<BlogPost & { author: { id: string; name: string } | null }> {

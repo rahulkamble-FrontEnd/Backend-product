@@ -44,6 +44,13 @@ export class BlogController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
+  @Get('admin')
+  async listAllForAdmin() {
+    return this.blogService.listAllForAdmin();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Get('check-slug')
   async checkSlug(
     @Query('slug') slug: string,
