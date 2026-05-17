@@ -43,10 +43,18 @@ async function bootstrap() {
     'https://product.customfurnish.com',
   ];
 
+  const isDev = process.env.NODE_ENV !== 'production';
+  const localDevOrigin =
+    /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
   app.enableCors({
     origin: ((origin, callback) => {
       // Allow non-browser requests (curl/postman) and configured browser origins.
       if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      if (isDev && localDevOrigin.test(origin)) {
         callback(null, true);
         return;
       }

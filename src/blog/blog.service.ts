@@ -85,6 +85,19 @@ export class BlogService {
     return this.attachAuthorSummary(posts);
   }
 
+  async listAllForAdmin(): Promise<
+    Array<BlogPost & { author: { id: string; name: string } | null }>
+  > {
+    const posts = await this.blogPostRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.category', 'category')
+      .leftJoinAndSelect('blog.author', 'author')
+      .orderBy('blog.updatedAt', 'DESC')
+      .addOrderBy('blog.createdAt', 'DESC')
+      .getMany();
+    return this.attachAuthorSummary(posts);
+  }
+
   async getPublishedBySlug(
     slug: string,
   ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
@@ -288,6 +301,8 @@ export class BlogService {
   async update(
     postId: string,
     dto: UpdateBlogPostDto,
+    userId: string,
+    featuredImage?: Express.Multer.File,
   ): Promise<BlogPost & { author: { id: string; name: string } | null }> {
     const post = await this.blogPostRepository.findOne({
       where: { id: postId },
@@ -324,7 +339,15 @@ export class BlogService {
         post.category = null;
       }
     }
-    if (dto.featuredImageS3Key !== undefined) {
+    if (featuredImage) {
+      const fileExt = extname(featuredImage.originalname).toLowerCase();
+      const s3Key = `products/blog/${userId}/${uuidv4()}${fileExt}`;
+      post.featuredImageS3Key = await this.s3Service.uploadFile(
+        s3Key,
+        featuredImage.buffer,
+        featuredImage.mimetype,
+      );
+    } else if (dto.featuredImageS3Key !== undefined) {
       post.featuredImageS3Key = dto.featuredImageS3Key;
     }
     if (dto.featuredImageAlt !== undefined) {
