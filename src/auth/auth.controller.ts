@@ -25,7 +25,9 @@ export class AuthController {
     return {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      // Dev SPA (e.g. :4200) → API (:3000) is cross-site; Lax cookies are not sent on fetch().
+      // SameSite=None works on localhost without Secure in modern browsers.
+      sameSite: 'none' as const,
       path: '/',
       maxAge: 3600000, // 1 hour
     };
