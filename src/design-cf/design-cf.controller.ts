@@ -42,7 +42,7 @@ export class DesignCfController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Post()
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -87,7 +87,7 @@ export class DesignCfController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Put(':id')
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -132,7 +132,7 @@ export class DesignCfController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Delete(':id')
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.designCfService.remove(id);
