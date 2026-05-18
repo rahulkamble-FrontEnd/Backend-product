@@ -34,6 +34,11 @@ export class TrendingController {
     return this.trendingService.listAll();
   }
 
+  @Get(':id')
+  async getById(@Param('id', ParseUUIDPipe) id: string) {
+    return this.trendingService.getById(id);
+  }
+
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.BLOGADMIN, UserRole.ADMIN)
   @Post()

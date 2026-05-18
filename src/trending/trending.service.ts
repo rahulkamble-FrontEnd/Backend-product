@@ -20,20 +20,34 @@ export class TrendingService {
     private readonly s3Service: S3Service,
   ) {}
 
+  private serializeEntry(entry: Trending) {
+    const imageUrl = this.s3Service.getPublicUrl(entry.s3Key);
+    return {
+      id: entry.id,
+      title: entry.title,
+      styleTag: entry.styleTag,
+      s3Key: entry.s3Key,
+      url: imageUrl,
+      imageUrl,
+      caption: entry.caption,
+      createdAt: entry.createdAt,
+    };
+  }
+
   async listAll(): Promise<unknown[]> {
     const entries = await this.trendingRepository.find({
       order: { createdAt: 'DESC' },
     });
 
-    return entries.map((entry) => ({
-      id: entry.id,
-      title: entry.title,
-      styleTag: entry.styleTag,
-      s3Key: entry.s3Key,
-      url: this.s3Service.getPublicUrl(entry.s3Key),
-      caption: entry.caption,
-      createdAt: entry.createdAt,
-    }));
+    return entries.map((entry) => this.serializeEntry(entry));
+  }
+
+  async getById(id: string): Promise<unknown> {
+    const entry = await this.trendingRepository.findOne({ where: { id } });
+    if (!entry) {
+      throw new NotFoundException(`Trending entry with id "${id}" not found`);
+    }
+    return this.serializeEntry(entry);
   }
 
   async create(
