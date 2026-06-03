@@ -36,11 +36,18 @@ async function bootstrap() {
   //   origin: true, // In production, replace with your frontend URL
   //   credentials: true, // Required for cookies to work
   // });
+  const extraOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   const allowedOrigins = [
     'http://localhost:4200',
     'http://127.0.0.1:4200',
     'https://main.d2luioc9rp1h71.amplifyapp.com',
+    'https://staging.d1fxytyprexnok.amplifyapp.com',
     'https://product.customfurnish.com',
+    ...extraOrigins,
   ];
 
   const isDev = process.env.NODE_ENV !== 'production';
