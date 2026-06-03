@@ -10,6 +10,11 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+/** Test/staging bucket (Singapore). Prod bucket stays in ap-south-1. */
+const TEST_S3_BUCKET = 'test-products-customfurnish';
+const TEST_S3_REGION = 'ap-southeast-1';
+const PROD_S3_REGION = 'ap-south-1';
+
 @Injectable()
 export class S3Service {
   private readonly s3Client: S3Client;
@@ -17,8 +22,15 @@ export class S3Service {
   private readonly region: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.region = this.configService.get<string>('AWS_REGION') ?? 'ap-south-1';
     this.bucket = this.configService.get<string>('AWS_S3_BUCKET') ?? '';
+    const configuredRegion = this.configService.get<string>('AWS_REGION');
+
+    // Test bucket must use ap-southeast-1; wrong region causes "specified endpoint" S3 errors.
+    if (this.bucket === TEST_S3_BUCKET) {
+      this.region = TEST_S3_REGION;
+    } else {
+      this.region = configuredRegion ?? PROD_S3_REGION;
+    }
 
     this.s3Client = new S3Client({
       region: this.region,
