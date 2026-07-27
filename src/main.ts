@@ -47,6 +47,7 @@ async function bootstrap() {
     'https://main.d2luioc9rp1h71.amplifyapp.com',
     'https://staging.d1fxytyprexnok.amplifyapp.com',
     'https://product.customfurnish.com',
+    'https://productstg.customfurnish.in',
     ...extraOrigins,
   ];
 
