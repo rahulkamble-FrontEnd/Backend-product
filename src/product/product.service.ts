@@ -26,6 +26,22 @@ import type { AuthUser } from '../auth/types/auth-user.type';
 
 @Injectable()
 export class ProductService {
+  /** Top-level category slug → product slug code (e.g. core-materials → CM). */
+  private static readonly PARENT_CATEGORY_CODES: Record<string, string> = {
+    'core-materials': 'CM',
+    'flooring-tiles': 'FT',
+    'counter-tops': 'CT',
+    glass: 'GL',
+    'handles-knobs': 'HK',
+    fabrics: 'FA',
+    hardware: 'HW',
+    ceiling: 'CL',
+    mirrors: 'MR',
+    finishes: 'FN',
+    lighting: 'LT',
+    'wall-decorative': 'WD',
+  };
+
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
@@ -51,52 +67,51 @@ export class ProductService {
       new Set((categoryIds ?? []).map((id) => id?.trim()).filter(Boolean)),
     );
 
-    if (normalizedCategoryIds.length > 0) {
-      const existingCategories = await this.categoryRepository.find({
-        where: { id: In(normalizedCategoryIds) },
-        relations: ['parent'],
-      });
-      const existingCategoryIds = new Set(
-        existingCategories.map((cat) => cat.id),
+    if (normalizedCategoryIds.length === 0) {
+      throw new BadRequestException(
+        'categoryIds is required to generate product slug',
       );
-      const invalidCategoryIds = normalizedCategoryIds.filter(
-        (id) => !existingCategoryIds.has(id),
-      );
-      if (invalidCategoryIds.length > 0) {
-        throw new BadRequestException(
-          `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
-        );
-      }
+    }
 
-      const nonSubCategoryIds = existingCategories
-        .filter((cat) => !cat.parent)
-        .map((cat) => cat.id);
-      if (nonSubCategoryIds.length > 0) {
-        throw new BadRequestException(
-          `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
-        );
-      }
+    const existingCategories = await this.categoryRepository.find({
+      where: { id: In(normalizedCategoryIds) },
+      relations: ['parent'],
+    });
+    const existingCategoryIds = new Set(
+      existingCategories.map((cat) => cat.id),
+    );
+    const invalidCategoryIds = normalizedCategoryIds.filter(
+      (id) => !existingCategoryIds.has(id),
+    );
+    if (invalidCategoryIds.length > 0) {
+      throw new BadRequestException(
+        `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
+      );
+    }
+
+    const nonSubCategoryIds = existingCategories
+      .filter((cat) => !cat.parent)
+      .map((cat) => cat.id);
+    if (nonSubCategoryIds.length > 0) {
+      throw new BadRequestException(
+        `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
+      );
     }
 
     if (productData.status === 'published') {
       productData.status = 'active';
     }
 
-    // Create unique slug from name
-    const slug =
-      productData.name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '') +
-      '-' +
-      Date.now().toString().slice(-4);
-
     return this.productRepository.manager.transaction(async (manager) => {
       const txProductRepository = manager.getRepository(Product);
       const txProductCategoryRepository =
         manager.getRepository(ProductCategory);
+
+      const slug = await this.buildProductSlug(
+        productData.name,
+        existingCategories,
+        { manager },
+      );
 
       const newProduct = txProductRepository.create({
         ...productData,
@@ -106,15 +121,13 @@ export class ProductService {
 
       const savedProduct = await txProductRepository.save(newProduct);
 
-      if (normalizedCategoryIds.length > 0) {
-        const productCategories = normalizedCategoryIds.map((categoryId) =>
-          txProductCategoryRepository.create({
-            productId: savedProduct.id,
-            categoryId,
-          }),
-        );
-        await txProductCategoryRepository.save(productCategories);
-      }
+      const productCategories = normalizedCategoryIds.map((categoryId) =>
+        txProductCategoryRepository.create({
+          productId: savedProduct.id,
+          categoryId,
+        }),
+      );
+      await txProductCategoryRepository.save(productCategories);
 
       return savedProduct;
     });
@@ -134,48 +147,47 @@ export class ProductService {
       new Set((categoryIds ?? []).map((id) => id?.trim()).filter(Boolean)),
     );
 
-    if (normalizedCategoryIds.length > 0) {
-      const txCategoryRepository = manager.getRepository(Category);
-      const existingCategories = await txCategoryRepository.find({
-        where: { id: In(normalizedCategoryIds) },
-        relations: ['parent'],
-      });
-      const existingCategoryIds = new Set(
-        existingCategories.map((cat) => cat.id),
+    if (normalizedCategoryIds.length === 0) {
+      throw new BadRequestException(
+        'categoryIds is required to generate product slug',
       );
-      const invalidCategoryIds = normalizedCategoryIds.filter(
-        (id) => !existingCategoryIds.has(id),
-      );
-      if (invalidCategoryIds.length > 0) {
-        throw new BadRequestException(
-          `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
-        );
-      }
+    }
 
-      const nonSubCategoryIds = existingCategories
-        .filter((cat) => !cat.parent)
-        .map((cat) => cat.id);
-      if (nonSubCategoryIds.length > 0) {
-        throw new BadRequestException(
-          `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
-        );
-      }
+    const txCategoryRepository = manager.getRepository(Category);
+    const existingCategories = await txCategoryRepository.find({
+      where: { id: In(normalizedCategoryIds) },
+      relations: ['parent'],
+    });
+    const existingCategoryIds = new Set(
+      existingCategories.map((cat) => cat.id),
+    );
+    const invalidCategoryIds = normalizedCategoryIds.filter(
+      (id) => !existingCategoryIds.has(id),
+    );
+    if (invalidCategoryIds.length > 0) {
+      throw new BadRequestException(
+        `Invalid categoryIds: ${invalidCategoryIds.join(', ')}`,
+      );
+    }
+
+    const nonSubCategoryIds = existingCategories
+      .filter((cat) => !cat.parent)
+      .map((cat) => cat.id);
+    if (nonSubCategoryIds.length > 0) {
+      throw new BadRequestException(
+        `Products can only be linked to sub-categories. Top-level categoryIds: ${nonSubCategoryIds.join(', ')}`,
+      );
     }
 
     if (productData.status === 'published') {
       productData.status = 'active';
     }
 
-    // Create unique slug from name (same behavior as single create()).
-    const slug =
-      productData.name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '') +
-      '-' +
-      Date.now().toString().slice(-4);
+    const slug = await this.buildProductSlug(
+      productData.name,
+      existingCategories,
+      { manager },
+    );
 
     const txProductRepository = manager.getRepository(Product);
     const txProductCategoryRepository = manager.getRepository(ProductCategory);
@@ -188,15 +200,13 @@ export class ProductService {
 
     const savedProduct = await txProductRepository.save(newProduct);
 
-    if (normalizedCategoryIds.length > 0) {
-      const productCategories = normalizedCategoryIds.map((categoryId) =>
-        txProductCategoryRepository.create({
-          productId: savedProduct.id,
-          categoryId,
-        }),
-      );
-      await txProductCategoryRepository.save(productCategories);
-    }
+    const productCategories = normalizedCategoryIds.map((categoryId) =>
+      txProductCategoryRepository.create({
+        productId: savedProduct.id,
+        categoryId,
+      }),
+    );
+    await txProductCategoryRepository.save(productCategories);
 
     return savedProduct;
   }
@@ -515,16 +525,16 @@ export class ProductService {
 
     if (dto.name !== undefined) {
       updateData.name = dto.name;
-      const slug =
-        dto.name
-          .toLowerCase()
-          .trim()
-          .replace(/[^\w\s-]/g, '')
-          .replace(/[\s_-]+/g, '-')
-          .replace(/^-+|-+$/g, '') +
-        '-' +
-        Date.now().toString().slice(-4);
-      updateData.slug = slug;
+      const productCategories = await this.productCategoryRepository.find({
+        where: { productId: id },
+        relations: ['category', 'category.parent'],
+      });
+      const categories = productCategories
+        .map((pc) => pc.category)
+        .filter((category): category is Category => Boolean(category));
+      updateData.slug = await this.buildProductSlug(dto.name, categories, {
+        existingSlug: product.slug,
+      });
     }
 
     if (dto.sku !== undefined) updateData.sku = dto.sku;
@@ -1707,5 +1717,115 @@ export class ProductService {
       typeof value === 'boolean' ||
       typeof value === 'bigint'
     );
+  }
+
+  /**
+   * Builds slug as `{name}-{CODE}{####}` e.g. `gl-ashen-maple-CM0001`.
+   * CODE comes from the product's top-level (parent) category.
+   */
+  private async buildProductSlug(
+    name: string,
+    categories: Category[],
+    options?: {
+      existingSlug?: string;
+      manager?: EntityManager;
+    },
+  ): Promise<string> {
+    const namePart = this.slugifyProductName(name);
+    if (!namePart) {
+      throw new BadRequestException('Product name results in an empty slug');
+    }
+
+    if (!categories.length) {
+      throw new BadRequestException(
+        'At least one category is required to generate product slug',
+      );
+    }
+
+    const parent = categories[0]?.parent;
+    const code = this.resolveParentCategoryCode(parent);
+    const existingSerial = this.extractSerialFromSlug(
+      options?.existingSlug,
+      code,
+    );
+    const serial =
+      existingSerial ??
+      (await this.getNextCategorySerial(code, options?.manager));
+
+    return `${namePart}-${code}${serial}`;
+  }
+
+  private slugifyProductName(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  private resolveParentCategoryCode(
+    parent: Category | null | undefined,
+  ): string {
+    if (!parent?.slug) {
+      throw new BadRequestException(
+        'Product category must belong to a top-level parent category',
+      );
+    }
+
+    const code =
+      ProductService.PARENT_CATEGORY_CODES[parent.slug.toLowerCase()];
+    if (!code) {
+      throw new BadRequestException(
+        `No slug code mapped for parent category "${parent.name}" (${parent.slug})`,
+      );
+    }
+    return code;
+  }
+
+  private extractSerialFromSlug(
+    slug: string | undefined,
+    code: string,
+  ): string | null {
+    if (!slug) return null;
+    const match = slug.match(new RegExp(`-${code}(\\d{4})$`, 'i'));
+    return match?.[1] ?? null;
+  }
+
+  private async getNextCategorySerial(
+    code: string,
+    manager?: EntityManager,
+  ): Promise<string> {
+    const repo = manager
+      ? manager.getRepository(Product)
+      : this.productRepository;
+
+    const rows = await repo
+      .createQueryBuilder('p')
+      .select(['p.slug'])
+      .where('p.slug REGEXP :pattern', {
+        pattern: `-${code}[0-9]{4}$`,
+      })
+      .withDeleted()
+      .getMany();
+
+    let max = 0;
+    const serialPattern = new RegExp(`-${code}(\\d{4})$`, 'i');
+    for (const row of rows) {
+      const match = row.slug?.match(serialPattern);
+      if (!match) continue;
+      const value = Number.parseInt(match[1], 10);
+      if (!Number.isNaN(value) && value > max) {
+        max = value;
+      }
+    }
+
+    if (max >= 9999) {
+      throw new BadRequestException(
+        `Slug serial limit reached for category code ${code}`,
+      );
+    }
+
+    return String(max + 1).padStart(4, '0');
   }
 }
