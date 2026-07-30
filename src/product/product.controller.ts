@@ -13,10 +13,14 @@ import {
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
+  StreamableFile,
+  Res,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { ProductService } from './product.service';
+import { DataPrepService } from '../data-prep/data-prep.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UploadProductImageDto } from './dto/upload-product-image.dto';
@@ -54,7 +58,10 @@ const MAX_ZIP_SIZE_BYTES = ZIP_UPLOAD_MAX_MB * 1024 * 1024;
 
 @Controller('products')
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(
+    private readonly productService: ProductService,
+    private readonly dataPrepService: DataPrepService,
+  ) {}
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
@@ -217,6 +224,167 @@ export class ProductController {
     }
 
     return this.productService.bulkCreateFromXlsx(file, imagesZip, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post('data-prep')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'file', maxCount: 1 },
+        { name: 'imagesZip', maxCount: 1 },
+      ],
+      {
+        storage: memoryStorage(),
+        limits: {
+          fileSize: MAX_ZIP_SIZE_BYTES,
+          files: 2,
+        },
+        fileFilter: (_req, file, cb) => {
+          const originalName = file.originalname.toLowerCase();
+          const isSpreadsheetField = file.fieldname === 'file';
+          const isZipField = file.fieldname === 'imagesZip';
+
+          if (isSpreadsheetField) {
+            const hasXlsxExtension = originalName.endsWith('.xlsx');
+            const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
+              file.mimetype,
+            );
+            const isGenericBinaryXlsx =
+              file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+            if (!allowedMimeType && !isGenericBinaryXlsx) {
+              return cb(
+                new BadRequestException(
+                  `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+                ),
+                false,
+              );
+            }
+            return cb(null, true);
+          }
+
+          if (isZipField) {
+            const hasZipExtension = originalName.endsWith('.zip');
+            const allowedMimeType =
+              ALLOWED_ZIP_MIME_TYPES.includes(file.mimetype) ||
+              file.mimetype === 'application/octet-stream';
+            if (!hasZipExtension || !allowedMimeType) {
+              return cb(
+                new BadRequestException(
+                  `Unsupported ZIP file type "${file.mimetype}". Upload a .zip file in "imagesZip".`,
+                ),
+                false,
+              );
+            }
+            return cb(null, true);
+          }
+
+          return cb(
+            new BadRequestException(
+              `Unsupported field "${file.fieldname}". Use "file" and "imagesZip".`,
+            ),
+            false,
+          );
+        },
+      },
+    ),
+  )
+  async dataPrepConvert(
+    @UploadedFiles()
+    filesByField: {
+      file?: Express.Multer.File[];
+      imagesZip?: Express.Multer.File[];
+    },
+    @Body()
+    body: {
+      categoryId?: string;
+      finishType?: string;
+      status?: string;
+      materialType?: string;
+      description?: string;
+      bookName?: string;
+      brand?: string;
+      dimensions?: string;
+      packName?: string;
+    },
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const file = filesByField?.file?.[0];
+    const imagesZip = filesByField?.imagesZip?.[0];
+
+    if (!file) {
+      throw new BadRequestException(
+        'Spreadsheet file is required. Send it as multipart/form-data with field name "file".',
+      );
+    }
+    if (!imagesZip) {
+      throw new BadRequestException(
+        'Images ZIP is required. Send it as multipart/form-data with field name "imagesZip".',
+      );
+    }
+    if (file.size > MAX_SPREADSHEET_SIZE_BYTES) {
+      throw new BadRequestException(
+        `Spreadsheet is too large. Max allowed: ${MAX_SPREADSHEET_SIZE_BYTES / (1024 * 1024)} MB.`,
+      );
+    }
+
+    const result = await this.dataPrepService.convertFromUploads(
+      file,
+      imagesZip,
+      {
+        categoryId: body.categoryId || '',
+        finishType: body.finishType,
+        status: body.status,
+        materialType: body.materialType,
+        description: body.description,
+        bookName: body.bookName,
+        brand: body.brand,
+        dimensions: body.dimensions,
+        packName: body.packName,
+      },
+    );
+
+    res.setHeader(
+      'Content-Type',
+      'application/zip',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.packFileName}"`,
+    );
+    res.setHeader('X-Data-Prep-Matched', String(result.summary.matched));
+    res.setHeader(
+      'X-Data-Prep-Skipped-No-Image',
+      String(result.summary.skippedNoImage),
+    );
+    res.setHeader(
+      'X-Data-Prep-Orphans',
+      String(result.summary.orphanImages),
+    );
+    res.setHeader(
+      'X-Data-Prep-Vendor-Rows',
+      String(result.summary.vendorRows),
+    );
+    res.setHeader(
+      'X-Data-Prep-Category-Id',
+      result.summary.categoryId,
+    );
+    res.setHeader(
+      'X-Data-Prep-Category-Name',
+      encodeURIComponent(result.summary.categoryName),
+    );
+    res.setHeader('Access-Control-Expose-Headers', [
+      'Content-Disposition',
+      'X-Data-Prep-Matched',
+      'X-Data-Prep-Skipped-No-Image',
+      'X-Data-Prep-Orphans',
+      'X-Data-Prep-Vendor-Rows',
+      'X-Data-Prep-Category-Id',
+      'X-Data-Prep-Category-Name',
+    ].join(', '));
+
+    return new StreamableFile(result.packZipBuffer);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
