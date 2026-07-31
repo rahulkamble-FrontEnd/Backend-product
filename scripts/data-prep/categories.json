@@ -1,0 +1,290 @@
+[
+  {
+    "name": "BWP PLYWOOD",
+    "id": "3d2f32d7-4077-4c1c-803e-d9a67caf80bf",
+    "parent": "CORE MATERIALS",
+    "slug": "bwp-plywood"
+  },
+  {
+    "name": "HDHMR",
+    "id": "f0b0e93d-509b-4a58-bfd3-7da620a7e546",
+    "parent": "CORE MATERIALS",
+    "slug": "hdhmr"
+  },
+  {
+    "name": "MDF",
+    "id": "598be748-014f-433c-ae45-e6c33db2878b",
+    "parent": "CORE MATERIALS",
+    "slug": "mdf"
+  },
+  {
+    "name": "MR PLYWOOD",
+    "id": "3624f35f-442b-4d56-b4f0-15ccaa7fa210",
+    "parent": "CORE MATERIALS",
+    "slug": "mr-plywood"
+  },
+  {
+    "name": "PRELAM HDHMR",
+    "id": "cf0dd333-96ea-4ef7-9a5d-f817de46912f",
+    "parent": "CORE MATERIALS",
+    "slug": "prelam-hdhmr"
+  },
+  {
+    "name": "PRELAM MDF",
+    "id": "8563fdb0-e366-49ac-984a-229d86f5c52e",
+    "parent": "CORE MATERIALS",
+    "slug": "prelam-mdf"
+  },
+  {
+    "name": "ACRYLIC",
+    "id": "11ffcaf8-f427-41b2-94c9-13f591ac8940",
+    "parent": "FINISHES",
+    "slug": "acrylic"
+  },
+  {
+    "name": "LAMINATES",
+    "id": "953d4497-fb68-4710-a091-02a16b1dc233",
+    "parent": "FINISHES",
+    "slug": "laminates"
+  },
+  {
+    "name": "PRELAM ACRYLIC",
+    "id": "f898ea7e-6363-46ba-b0df-6fb6e19301e8",
+    "parent": "FINISHES",
+    "slug": "prelam-acrylic"
+  },
+  {
+    "name": "PRELAM HDHMR",
+    "id": "1c17f590-2d60-4cba-954e-7b0e844c733e",
+    "parent": "FINISHES",
+    "slug": "prelam-hdhmr-2"
+  },
+  {
+    "name": "PRELAM MDF",
+    "id": "0e712b11-1663-4791-8957-19c92bbae5e0",
+    "parent": "FINISHES",
+    "slug": "prelam-mdf-2"
+  },
+  {
+    "name": "PRELAM UV COATED",
+    "id": "5fb0c435-f363-45a6-ad60-f5dc14f6df3c",
+    "parent": "FINISHES",
+    "slug": "prelam-uv-coated"
+  },
+  {
+    "name": "PU PAINTS",
+    "id": "74c49f99-5aa6-4a47-9790-870d1437ee70",
+    "parent": "FINISHES",
+    "slug": "pu-paints"
+  },
+  {
+    "name": "HANDLE",
+    "id": "1567ef7d-961c-4291-bc04-e227c9c4a2b7",
+    "parent": "HANDLES & KNOBS",
+    "slug": "handle"
+  },
+  {
+    "name": "KNOB",
+    "id": "bc558d6a-6f27-4567-b54b-90239453841b",
+    "parent": "HANDLES & KNOBS",
+    "slug": "knob"
+  },
+  {
+    "name": "WALL PANELS",
+    "id": "14bb987b-a0f9-46e3-931c-36cd73ccb5be",
+    "parent": "WALL DECORATIVE",
+    "slug": "wall-panels"
+  },
+  {
+    "name": "WALL PAPERS",
+    "id": "63439e6a-b9d6-4528-ab47-fbe162a2c910",
+    "parent": "WALL DECORATIVE",
+    "slug": "wall-papers"
+  },
+  {
+    "name": "WALL TRIMS",
+    "id": "51d7cee8-9cb7-41e8-82e4-36d1ceab3bba",
+    "parent": "WALL DECORATIVE",
+    "slug": "wall-trims"
+  },
+  {
+    "name": "GRANITE",
+    "id": "186ec80a-8430-4a3b-840c-a8432f7f3ea8",
+    "parent": "COUNTER TOPS",
+    "slug": "granite"
+  },
+  {
+    "name": "QUARTZ",
+    "id": "c1678c22-2ae7-4bcf-b9b4-59af39236f1a",
+    "parent": "COUNTER TOPS",
+    "slug": "quartz"
+  },
+  {
+    "name": "DADO TILES",
+    "id": "8271aeee-4917-457d-aa6f-5559399d3202",
+    "parent": "FLOORING & TILES",
+    "slug": "dado-tiles"
+  },
+  {
+    "name": "WOODEN FLOORING",
+    "id": "69cac79c-9199-4f1e-bc8c-a676c37d3a10",
+    "parent": "FLOORING & TILES",
+    "slug": "wooden-flooring"
+  },
+  {
+    "name": "BASKETS & PULLOUTS",
+    "id": "782c1341-8a7b-404c-857e-e157305d7bb6",
+    "parent": "HARDWARE",
+    "slug": "baskets-pullouts"
+  },
+  {
+    "name": "CORNER UNIT ACCESSORIES",
+    "id": "2ba43738-c58d-48bb-810e-7ead6a43623e",
+    "parent": "HARDWARE",
+    "slug": "corner-unit-accessories"
+  },
+  {
+    "name": "ROLLUP SHUTTERS",
+    "id": "475c28d2-bdd0-4e99-9889-148f29f41fea",
+    "parent": "HARDWARE",
+    "slug": "rollup-shutters"
+  },
+  {
+    "name": "TANDEM DRAWERS",
+    "id": "5ff82ed6-8f10-4ed0-8c1c-84e958fac515",
+    "parent": "HARDWARE",
+    "slug": "tandem-drawers"
+  },
+  {
+    "name": "WARDROBE ACCESSORIES",
+    "id": "9a4cfe3c-b6c5-4f94-968a-645c36770508",
+    "parent": "HARDWARE",
+    "slug": "wardrobe-accessories"
+  },
+  {
+    "name": "WARDROBE BASKETS",
+    "id": "cf2d0c51-31e1-4024-b900-de324146fcc2",
+    "parent": "HARDWARE",
+    "slug": "wardrobe-baskets"
+  },
+  {
+    "name": "GYPSUM",
+    "id": "beb9cc01-85b8-4021-af01-85f7d33c9cc8",
+    "parent": "CEILING",
+    "slug": "gypsum"
+  },
+  {
+    "name": "PVC",
+    "id": "1be89886-a0ed-4091-af4b-abd878934995",
+    "parent": "CEILING",
+    "slug": "pvc"
+  },
+  {
+    "name": "WOODEN",
+    "id": "eb8d60ea-c1b9-4c4c-8453-87c25fbb4612",
+    "parent": "CEILING",
+    "slug": "wooden"
+  },
+  {
+    "name": "COB",
+    "id": "605eebb8-ff3b-41b0-b6d9-dd56598085d6",
+    "parent": "LIGHTING",
+    "slug": "cob"
+  },
+  {
+    "name": "PANEL",
+    "id": "6b81a841-31ef-4b22-9c42-570bb189b5d2",
+    "parent": "LIGHTING",
+    "slug": "panel"
+  },
+  {
+    "name": "SPOT",
+    "id": "7e4b874f-7ca4-4203-be20-f9c24a0e35f7",
+    "parent": "LIGHTING",
+    "slug": "spot"
+  },
+  {
+    "name": "STRIP",
+    "id": "fcb121fc-c655-4b74-89dc-5b65ab4d487b",
+    "parent": "LIGHTING",
+    "slug": "strip"
+  },
+  {
+    "name": "SURFACE",
+    "id": "43ca21fb-9549-4e4a-ab2f-ecd3b8d1da7e",
+    "parent": "LIGHTING",
+    "slug": "surface"
+  },
+  {
+    "name": "TRACK",
+    "id": "9e5aa7ff-a675-41e4-af2c-7e4191a7562c",
+    "parent": "LIGHTING",
+    "slug": "track"
+  },
+  {
+    "name": "ETCHED",
+    "id": "ddf9b8bc-ae73-4fdc-badf-4d78e417357e",
+    "parent": "GLASS",
+    "slug": "etched"
+  },
+  {
+    "name": "FROSTED",
+    "id": "f4aca376-1057-41a6-be4f-8493dfcc55b8",
+    "parent": "GLASS",
+    "slug": "frosted"
+  },
+  {
+    "name": "LACQUERED",
+    "id": "6e834168-9b43-4d45-abd1-a96a488ba146",
+    "parent": "GLASS",
+    "slug": "lacquered"
+  },
+  {
+    "name": "LAMINATED",
+    "id": "6112d5fd-492f-4107-beba-c5364d6fc3c7",
+    "parent": "GLASS",
+    "slug": "laminated"
+  },
+  {
+    "name": "PLAIN",
+    "id": "1e42d0c4-6dee-4bc6-9184-2f3231f0d67c",
+    "parent": "GLASS",
+    "slug": "plain-2"
+  },
+  {
+    "name": "TEXTURED",
+    "id": "b11ba7f2-1c68-46de-a143-cc0edfc9ee52",
+    "parent": "GLASS",
+    "slug": "textured"
+  },
+  {
+    "name": "TINTED",
+    "id": "ddb3ff79-5190-42ae-a604-7ac1b340845c",
+    "parent": "GLASS",
+    "slug": "tinted-2"
+  },
+  {
+    "name": "PLAIN",
+    "id": "a66c1461-b2d1-4a42-accb-d5f8e18ae3ee",
+    "parent": "MIRRORS",
+    "slug": "plain"
+  },
+  {
+    "name": "TINTED",
+    "id": "17dc58d5-951d-43a6-823a-1e52482cb2cb",
+    "parent": "MIRRORS",
+    "slug": "tinted"
+  },
+  {
+    "name": "V GROOVE",
+    "id": "2b6a77da-9fcd-4a3c-b044-39896a25fff2",
+    "parent": "MIRRORS",
+    "slug": "v-groove"
+  },
+  {
+    "name": "FABRIC",
+    "id": "f042b4a1-a6b3-426a-8774-60cf057c95b7",
+    "parent": "FABRICS",
+    "slug": "fabric"
+  }
+]

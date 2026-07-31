@@ -10,6 +10,7 @@ import { Category } from '../category/category.entity';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { ProductTag } from './product-tag.entity';
 import { Tag } from '../tags/tag.entity';
+import { DataPrepService } from '../data-prep/data-prep.service';
 
 @Module({
   imports: [
@@ -23,6 +24,6 @@ import { Tag } from '../tags/tag.entity';
     ]),
   ],
   controllers: [ProductController],
-  providers: [ProductService, S3Service, OptionalJwtAuthGuard],
+  providers: [ProductService, S3Service, OptionalJwtAuthGuard, DataPrepService],
 })
 export class ProductModule {}

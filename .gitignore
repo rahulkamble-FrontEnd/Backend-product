@@ -46,6 +46,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# data-prep converter outputs
+/scripts/data-prep/output/
+
 # Runtime data
 pids
 *.pid
