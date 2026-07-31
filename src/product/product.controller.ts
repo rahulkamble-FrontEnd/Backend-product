@@ -13,7 +13,6 @@ import {
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
-  StreamableFile,
   Res,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -308,8 +307,8 @@ export class ProductController {
       dimensions?: string;
       packName?: string;
     },
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
+    @Res() res: Response,
+  ): Promise<void> {
     const file = filesByField?.file?.[0];
     const imagesZip = filesByField?.imagesZip?.[0];
 
@@ -345,10 +344,8 @@ export class ProductController {
       },
     );
 
-    res.setHeader(
-      'Content-Type',
-      'application/zip',
-    );
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Length', String(result.packZipBuffer.length));
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${result.packFileName}"`,
@@ -358,33 +355,27 @@ export class ProductController {
       'X-Data-Prep-Skipped-No-Image',
       String(result.summary.skippedNoImage),
     );
-    res.setHeader(
-      'X-Data-Prep-Orphans',
-      String(result.summary.orphanImages),
-    );
-    res.setHeader(
-      'X-Data-Prep-Vendor-Rows',
-      String(result.summary.vendorRows),
-    );
-    res.setHeader(
-      'X-Data-Prep-Category-Id',
-      result.summary.categoryId,
-    );
+    res.setHeader('X-Data-Prep-Orphans', String(result.summary.orphanImages));
+    res.setHeader('X-Data-Prep-Vendor-Rows', String(result.summary.vendorRows));
+    res.setHeader('X-Data-Prep-Category-Id', result.summary.categoryId);
     res.setHeader(
       'X-Data-Prep-Category-Name',
       encodeURIComponent(result.summary.categoryName),
     );
-    res.setHeader('Access-Control-Expose-Headers', [
-      'Content-Disposition',
-      'X-Data-Prep-Matched',
-      'X-Data-Prep-Skipped-No-Image',
-      'X-Data-Prep-Orphans',
-      'X-Data-Prep-Vendor-Rows',
-      'X-Data-Prep-Category-Id',
-      'X-Data-Prep-Category-Name',
-    ].join(', '));
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      [
+        'Content-Disposition',
+        'X-Data-Prep-Matched',
+        'X-Data-Prep-Skipped-No-Image',
+        'X-Data-Prep-Orphans',
+        'X-Data-Prep-Vendor-Rows',
+        'X-Data-Prep-Category-Id',
+        'X-Data-Prep-Category-Name',
+      ].join(', '),
+    );
 
-    return new StreamableFile(result.packZipBuffer);
+    res.status(200).end(result.packZipBuffer);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

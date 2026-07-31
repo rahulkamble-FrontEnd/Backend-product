@@ -109,12 +109,27 @@ export type DataPrepResult = {
 
 @Injectable()
 export class DataPrepService {
-  private readonly convertCore = loadConvertCore();
+  private convertCore: ConvertCoreModule | null = null;
 
   constructor(
     @InjectRepository(Category)
     private readonly categoryRepository: Repository<Category>,
   ) {}
+
+  private getConvertCore(): ConvertCoreModule {
+    if (!this.convertCore) {
+      try {
+        this.convertCore = loadConvertCore();
+      } catch (error: unknown) {
+        throw new BadRequestException(
+          error instanceof Error
+            ? error.message
+            : 'Data prep converter is not available on this server',
+        );
+      }
+    }
+    return this.convertCore;
+  }
 
   async convertFromUploads(
     xlsxFile: Express.Multer.File,
@@ -149,10 +164,9 @@ export class DataPrepService {
       throw new BadRequestException('Selected category is inactive');
     }
 
+    const convertCore = this.getConvertCore();
     const packName = this.sanitizePackName(options.packName || 'data-prep');
-    const images = this.convertCore.collectImagesFromZipBuffer(
-      imagesZipFile.buffer,
-    );
+    const images = convertCore.collectImagesFromZipBuffer(imagesZipFile.buffer);
 
     if (!images.length) {
       throw new BadRequestException(
@@ -161,7 +175,7 @@ export class DataPrepService {
     }
 
     try {
-      const result = this.convertCore.convertVendorPack({
+      const result = convertCore.convertVendorPack({
         xlsxBuffer: xlsxFile.buffer,
         images,
         options: {
