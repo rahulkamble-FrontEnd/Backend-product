@@ -10,12 +10,16 @@ import {
   Param,
   Query,
   UploadedFiles,
+  UploadedFile,
   UseInterceptors,
   BadRequestException,
   ParseUUIDPipe,
   Res,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { ProductService } from './product.service';
@@ -223,6 +227,61 @@ export class ProductController {
     }
 
     return this.productService.bulkCreateFromXlsx(file, imagesZip, req.user);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
+  @Post('bulk-update-xlsx')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: MAX_SPREADSHEET_SIZE_BYTES,
+        files: 1,
+      },
+      fileFilter: (_req, file, cb) => {
+        const originalName = file.originalname.toLowerCase();
+        const hasXlsxExtension = originalName.endsWith('.xlsx');
+        const allowedMimeType = ALLOWED_SPREADSHEET_MIME_TYPES.includes(
+          file.mimetype,
+        );
+        const isGenericBinaryXlsx =
+          file.mimetype === 'application/octet-stream' && hasXlsxExtension;
+        if (!allowedMimeType && !isGenericBinaryXlsx) {
+          return cb(
+            new BadRequestException(
+              `Unsupported file type "${file.mimetype}". Upload an .xlsx file.`,
+            ),
+            false,
+          );
+        }
+        return cb(null, true);
+      },
+    }),
+  )
+  async bulkUpdateFromXlsx(@UploadedFile() file: Express.Multer.File): Promise<{
+    totalRows: number;
+    updatedCount: number;
+    notFoundCount: number;
+    skippedCount: number;
+    failedCount: number;
+    updated: Array<{ row: number; id: string; sku: string; fields: string[] }>;
+    notFound: Array<{ row: number; sku: string }>;
+    skipped: Array<{ row: number; sku?: string; message: string }>;
+    errors: Array<{ row: number; sku?: string; message: string }>;
+  }> {
+    if (!file) {
+      throw new BadRequestException(
+        'Spreadsheet file is required. Send it as multipart/form-data with field name "file".',
+      );
+    }
+    if (file.size > MAX_SPREADSHEET_SIZE_BYTES) {
+      throw new BadRequestException(
+        `Spreadsheet is too large. Max allowed: ${MAX_SPREADSHEET_SIZE_BYTES / (1024 * 1024)} MB.`,
+      );
+    }
+
+    return this.productService.bulkUpdateFromXlsx(file);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
