@@ -254,6 +254,11 @@ export class ProductService {
     } as ProductImage;
   }
 
+  /** ZIP image map keys are lowercased so Excel sku case does not block matching. */
+  private normalizeBulkImageSkuKey(sku: string): string {
+    return sku.trim().toLowerCase();
+  }
+
   private async uploadBulkImagesFromZipWithManager(
     manager: EntityManager,
     productId: string,
@@ -264,7 +269,7 @@ export class ProductService {
     >,
     uploadedS3Keys: string[],
   ): Promise<void> {
-    const images = zipImagesBySku.get(sku);
+    const images = zipImagesBySku.get(this.normalizeBulkImageSkuKey(sku));
     if (!images || images.length === 0) {
       return;
     }
@@ -439,13 +444,14 @@ export class ProductService {
         continue;
       }
 
-      const list = imagesBySku.get(parsed.sku) ?? [];
+      const skuKey = this.normalizeBulkImageSkuKey(parsed.sku);
+      const list = imagesBySku.get(skuKey) ?? [];
       list.push({
         sequence: parsed.sequence,
         fileName,
         file: fileBuffer,
       });
-      imagesBySku.set(parsed.sku, list);
+      imagesBySku.set(skuKey, list);
     }
 
     for (const list of imagesBySku.values()) {
@@ -468,7 +474,7 @@ export class ProductService {
       if (!Number.isInteger(sequence) || sequence <= 0) {
         return null;
       }
-      return { sku: withSequence[1], sequence };
+      return { sku: withSequence[1].trim(), sequence };
     }
 
     const singleImage = /^(.+)\.(jpe?g|png|webp)$/i.exec(fileName);
@@ -476,7 +482,7 @@ export class ProductService {
       return null;
     }
 
-    return { sku: singleImage[1], sequence: 1 };
+    return { sku: singleImage[1].trim(), sequence: 1 };
   }
 
   private getMimeTypeFromFileName(fileName: string): string {
@@ -497,7 +503,7 @@ export class ProductService {
       Array<{ sequence: number; fileName: string; file: Buffer }>
     >,
   ): Promise<void> {
-    const images = zipImagesBySku.get(sku);
+    const images = zipImagesBySku.get(this.normalizeBulkImageSkuKey(sku));
     if (!images || images.length === 0) {
       return;
     }
@@ -628,6 +634,258 @@ export class ProductService {
       matchedCount,
       updatedCount: result.affected ?? 0,
     };
+  }
+
+  /**
+   * Enrich existing products from XLSX.
+   * Match key: sku only. Empty cells are skipped (do not clear existing values).
+   * All-or-nothing: if any row fails, the whole transaction is rolled back.
+   */
+  async bulkUpdateFromXlsx(file: Express.Multer.File): Promise<{
+    totalRows: number;
+    updatedCount: number;
+    notFoundCount: number;
+    skippedCount: number;
+    failedCount: number;
+    updated: Array<{ row: number; id: string; sku: string; fields: string[] }>;
+    notFound: Array<{ row: number; sku: string }>;
+    skipped: Array<{ row: number; sku?: string; message: string }>;
+    errors: Array<{ row: number; sku?: string; message: string }>;
+  }> {
+    if (!file?.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Uploaded spreadsheet is empty');
+    }
+
+    const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      throw new BadRequestException('Spreadsheet does not contain any sheet');
+    }
+
+    const sheet = workbook.Sheets[firstSheetName];
+    const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: null,
+      raw: false,
+    });
+
+    if (rawRows.length === 0) {
+      throw new BadRequestException('Spreadsheet has no data rows');
+    }
+
+    const updated: Array<{
+      row: number;
+      id: string;
+      sku: string;
+      fields: string[];
+    }> = [];
+    const notFound: Array<{ row: number; sku: string }> = [];
+    const skipped: Array<{ row: number; sku?: string; message: string }> = [];
+    const errors: Array<{ row: number; sku?: string; message: string }> = [];
+
+    try {
+      const result = await this.productRepository.manager.transaction(
+        async (manager) => {
+          const productRepo = manager.getRepository(Product);
+
+          for (let index = 0; index < rawRows.length; index++) {
+            const excelRowNumber = index + 2;
+            const row = rawRows[index];
+            let sku: string | undefined;
+
+            try {
+              const parsed = this.buildPartialUpdateFromRow(row);
+              sku = parsed.sku;
+
+              if (!sku) {
+                const message = 'Missing required field "sku"';
+                skipped.push({ row: excelRowNumber, message });
+                errors.push({ row: excelRowNumber, message });
+                continue;
+              }
+
+              if (Object.keys(parsed.updateData).length === 0) {
+                const message =
+                  'No updatable fields provided (empty cells are skipped)';
+                skipped.push({ row: excelRowNumber, sku, message });
+                errors.push({ row: excelRowNumber, sku, message });
+                continue;
+              }
+
+              const product = await productRepo.findOne({ where: { sku } });
+              if (!product) {
+                notFound.push({ row: excelRowNumber, sku });
+                errors.push({
+                  row: excelRowNumber,
+                  sku,
+                  message: `Product not found for sku "${sku}"`,
+                });
+                continue;
+              }
+
+              await productRepo.update(product.id, parsed.updateData);
+              updated.push({
+                row: excelRowNumber,
+                id: product.id,
+                sku,
+                fields: Object.keys(parsed.updateData),
+              });
+            } catch (error: unknown) {
+              errors.push({
+                row: excelRowNumber,
+                sku: sku ?? this.extractSkuFromRow(row),
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to update product for this row',
+              });
+            }
+          }
+
+          if (errors.length > 0) {
+            throw new Error('BULK_UPDATE_HAS_ERRORS');
+          }
+
+          return {
+            totalRows: rawRows.length,
+            updatedCount: updated.length,
+            notFoundCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            updated,
+            notFound: [],
+            skipped: [],
+            errors: [],
+          };
+        },
+      );
+
+      return result;
+    } catch (error: unknown) {
+      const isBulkRollback =
+        error instanceof Error && error.message === 'BULK_UPDATE_HAS_ERRORS';
+
+      if (isBulkRollback) {
+        // DB transaction already rolled back — nothing was persisted.
+        return {
+          totalRows: rawRows.length,
+          updatedCount: 0,
+          notFoundCount: notFound.length,
+          skippedCount: skipped.length,
+          failedCount: errors.length,
+          updated: [],
+          notFound,
+          skipped,
+          errors,
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  private buildPartialUpdateFromRow(row: Record<string, unknown>): {
+    sku: string | undefined;
+    updateData: Partial<Product>;
+  } {
+    const normalizedRow: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      normalizedRow[this.normalizeHeaderKey(key)] = value;
+    }
+
+    const sku = this.toOptionalString(normalizedRow.sku);
+    const updateData: Partial<Product> = {};
+
+    const imsId = this.toOptionalString(normalizedRow.imsid);
+    if (imsId !== undefined) updateData.imsId = imsId;
+
+    const brand = this.toOptionalString(normalizedRow.brand);
+    if (brand !== undefined) updateData.brand = brand;
+
+    const description = this.toOptionalString(normalizedRow.description);
+    if (description !== undefined) updateData.description = description;
+
+    const bookName = this.toOptionalString(normalizedRow.bookname);
+    if (bookName !== undefined) updateData.bookName = bookName;
+
+    const pageNumber = this.toOptionalString(normalizedRow.pagenumber);
+    if (pageNumber !== undefined) updateData.pageNumber = pageNumber;
+
+    const application = this.toOptionalString(normalizedRow.application);
+    if (application !== undefined) updateData.application = application;
+
+    const materialType = this.toOptionalString(normalizedRow.materialtype);
+    if (materialType !== undefined) updateData.materialType = materialType;
+
+    const finishType = this.toOptionalString(normalizedRow.finishtype);
+    if (finishType !== undefined) updateData.finishType = finishType;
+
+    const colorName = this.toOptionalString(normalizedRow.colorname);
+    if (colorName !== undefined) updateData.colorName = colorName;
+
+    const colorHex = this.toOptionalString(normalizedRow.colorhex);
+    if (colorHex !== undefined) {
+      if (!/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(colorHex)) {
+        throw new BadRequestException(
+          `Invalid colorHex "${colorHex}". Use #RGB or #RRGGBB`,
+        );
+      }
+      updateData.colorHex = colorHex;
+    }
+
+    const thickness = this.toOptionalString(normalizedRow.thickness);
+    if (thickness !== undefined) updateData.thickness = thickness;
+
+    const dimensions = this.toOptionalString(normalizedRow.dimensions);
+    if (dimensions !== undefined) updateData.dimensions = dimensions;
+
+    const performanceRating = this.toOptionalNumber(
+      normalizedRow.performancerating,
+    );
+    if (performanceRating !== undefined) {
+      updateData.performanceRating = performanceRating;
+    }
+
+    const durabilityRating = this.toOptionalNumber(
+      normalizedRow.durabilityrating,
+    );
+    if (durabilityRating !== undefined) {
+      updateData.durabilityRating = durabilityRating;
+    }
+
+    const priceCategory = this.toOptionalNumber(normalizedRow.pricecategory);
+    if (priceCategory !== undefined) updateData.priceCategory = priceCategory;
+
+    const maintenanceRating = this.toOptionalNumber(
+      normalizedRow.maintenancerating,
+    );
+    if (maintenanceRating !== undefined) {
+      updateData.maintenanceRating = maintenanceRating;
+    }
+
+    const bestUsedFor = this.toOptionalStringArray(normalizedRow.bestusedfor);
+    if (bestUsedFor !== undefined) updateData.bestUsedFor = bestUsedFor;
+
+    const pros = this.toOptionalStringArray(normalizedRow.pros);
+    if (pros !== undefined) updateData.pros = pros;
+
+    const cons = this.toOptionalStringArray(normalizedRow.cons);
+    if (cons !== undefined) updateData.cons = cons;
+
+    const status = this.toOptionalString(normalizedRow.status);
+    if (status !== undefined) {
+      const normalizedStatus = status.toLowerCase();
+      if (
+        !['draft', 'active', 'archived', 'published'].includes(normalizedStatus)
+      ) {
+        throw new BadRequestException(
+          `Invalid status "${status}". Allowed: draft, active, archived, published`,
+        );
+      }
+      updateData.status =
+        normalizedStatus === 'published' ? 'active' : normalizedStatus;
+    }
+
+    return { sku, updateData };
   }
 
   async listProducts(
