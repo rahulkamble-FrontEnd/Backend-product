@@ -254,6 +254,11 @@ export class ProductService {
     } as ProductImage;
   }
 
+  /** ZIP image map keys are lowercased so Excel sku case does not block matching. */
+  private normalizeBulkImageSkuKey(sku: string): string {
+    return sku.trim().toLowerCase();
+  }
+
   private async uploadBulkImagesFromZipWithManager(
     manager: EntityManager,
     productId: string,
@@ -264,7 +269,7 @@ export class ProductService {
     >,
     uploadedS3Keys: string[],
   ): Promise<void> {
-    const images = zipImagesBySku.get(sku);
+    const images = zipImagesBySku.get(this.normalizeBulkImageSkuKey(sku));
     if (!images || images.length === 0) {
       return;
     }
@@ -439,13 +444,14 @@ export class ProductService {
         continue;
       }
 
-      const list = imagesBySku.get(parsed.sku) ?? [];
+      const skuKey = this.normalizeBulkImageSkuKey(parsed.sku);
+      const list = imagesBySku.get(skuKey) ?? [];
       list.push({
         sequence: parsed.sequence,
         fileName,
         file: fileBuffer,
       });
-      imagesBySku.set(parsed.sku, list);
+      imagesBySku.set(skuKey, list);
     }
 
     for (const list of imagesBySku.values()) {
@@ -468,7 +474,7 @@ export class ProductService {
       if (!Number.isInteger(sequence) || sequence <= 0) {
         return null;
       }
-      return { sku: withSequence[1], sequence };
+      return { sku: withSequence[1].trim(), sequence };
     }
 
     const singleImage = /^(.+)\.(jpe?g|png|webp)$/i.exec(fileName);
@@ -476,7 +482,7 @@ export class ProductService {
       return null;
     }
 
-    return { sku: singleImage[1], sequence: 1 };
+    return { sku: singleImage[1].trim(), sequence: 1 };
   }
 
   private getMimeTypeFromFileName(fileName: string): string {
@@ -497,7 +503,7 @@ export class ProductService {
       Array<{ sequence: number; fileName: string; file: Buffer }>
     >,
   ): Promise<void> {
-    const images = zipImagesBySku.get(sku);
+    const images = zipImagesBySku.get(this.normalizeBulkImageSkuKey(sku));
     if (!images || images.length === 0) {
       return;
     }
