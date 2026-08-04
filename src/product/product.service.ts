@@ -789,6 +789,9 @@ export class ProductService {
     const sku = this.toOptionalString(normalizedRow.sku);
     const updateData: Partial<Product> = {};
 
+    const imsId = this.toOptionalString(normalizedRow.imsid);
+    if (imsId !== undefined) updateData.imsId = imsId;
+
     const brand = this.toOptionalString(normalizedRow.brand);
     if (brand !== undefined) updateData.brand = brand;
 
