@@ -20,7 +20,7 @@ export class ListProductsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(400)
   limit?: number;
 
   @IsOptional()
@@ -65,6 +65,10 @@ export class ListProductsQueryDto {
 
   @IsOptional()
   @IsString()
+  materialType?: string;
+
+  @IsOptional()
+  @IsString()
   finishType?: string;
 
   @IsOptional()
@@ -74,4 +78,38 @@ export class ListProductsQueryDto {
   @IsOptional()
   @IsString()
   colorName?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  bookName?: string;
+
+  @IsOptional()
+  @IsString()
+  pageNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  application?: string;
+
+  @IsOptional()
+  @IsString()
+  colorHex?: string;
+
+  @IsOptional()
+  @IsString()
+  dimensions?: string;
+
+  /** CSV of fields that must be non-empty, e.g. brand,finishType */
+  @IsOptional()
+  @IsString()
+  withFields?: string;
+
+  /** CSV of fields that must be empty/null, e.g. materialType,colorName */
+  @IsOptional()
+  @IsString()
+  withoutFields?: string;
 }
