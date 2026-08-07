@@ -59,6 +59,11 @@ export class ListProductsQueryDto {
   @IsIn(['true', 'false'])
   includeCategories?: string;
 
+  /** true = only products with images; false = only products without images */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  hasImages?: string;
+
   @IsOptional()
   @IsString()
   brand?: string;
