@@ -953,6 +953,16 @@ export class ProductService {
       qb.leftJoinAndSelect('product.images', 'image');
     }
 
+    if (query.hasImages === 'true') {
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = product.id)`,
+      );
+    } else if (query.hasImages === 'false') {
+      qb.andWhere(
+        `NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = product.id)`,
+      );
+    }
+
     if (includeCategories) {
       qb.leftJoinAndSelect('product.productCategories', 'productCategory');
       qb.leftJoinAndSelect('productCategory.category', 'category');
