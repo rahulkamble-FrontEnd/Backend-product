@@ -4,7 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Brackets, EntityManager } from 'typeorm';
+import {
+  Repository,
+  In,
+  Brackets,
+  EntityManager,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 import AdmZip from 'adm-zip';
@@ -595,12 +601,20 @@ export class ProductService {
       updateData.status = dto.status === 'published' ? 'active' : dto.status;
     }
     if (dto.brand !== undefined) updateData.brand = dto.brand.trim();
+    if (dto.description !== undefined)
+      updateData.description = dto.description.trim();
+    if (dto.bookName !== undefined) updateData.bookName = dto.bookName.trim();
+    if (dto.pageNumber !== undefined)
+      updateData.pageNumber = dto.pageNumber.trim();
+    if (dto.application !== undefined)
+      updateData.application = dto.application.trim();
     if (dto.materialType !== undefined)
       updateData.materialType = dto.materialType.trim();
     if (dto.finishType !== undefined)
       updateData.finishType = dto.finishType.trim();
     if (dto.colorName !== undefined)
       updateData.colorName = dto.colorName.trim();
+    if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex.trim();
     if (dto.thickness !== undefined)
       updateData.thickness = dto.thickness.trim();
     if (dto.dimensions !== undefined)
@@ -609,8 +623,13 @@ export class ProductService {
       updateData.performanceRating = dto.performanceRating;
     if (dto.durabilityRating !== undefined)
       updateData.durabilityRating = dto.durabilityRating;
+    if (dto.priceCategory !== undefined)
+      updateData.priceCategory = dto.priceCategory;
     if (dto.maintenanceRating !== undefined)
       updateData.maintenanceRating = dto.maintenanceRating;
+    if (dto.bestUsedFor !== undefined) updateData.bestUsedFor = dto.bestUsedFor;
+    if (dto.pros !== undefined) updateData.pros = dto.pros;
+    if (dto.cons !== undefined) updateData.cons = dto.cons;
 
     if (Object.keys(updateData).length === 0) {
       throw new BadRequestException('At least one update field is required');
@@ -623,12 +642,11 @@ export class ProductService {
       throw new NotFoundException('No matching products found');
     }
 
-    const result = await this.productRepository
-      .createQueryBuilder()
-      .update(Product)
-      .set(updateData)
-      .where('id IN (:...productIds)', { productIds })
-      .execute();
+    // repository.update handles JSON columns (pros/cons/bestUsedFor) reliably
+    const result = await this.productRepository.update(
+      { id: In(productIds) },
+      updateData,
+    );
 
     return {
       matchedCount,
@@ -899,8 +917,15 @@ export class ProductService {
     filters: {
       finishes: string[];
       brands: string[];
+      materialTypes: string[];
       thicknesses: string[];
       colors: string[];
+      descriptions: string[];
+      bookNames: string[];
+      pageNumbers: string[];
+      applications: string[];
+      colorHexes: string[];
+      dimensions: string[];
     };
   }> {
     const hideBrand = requesterRole === UserRole.CUSTOMER;
@@ -909,9 +934,18 @@ export class ProductService {
     const includeImages = query.includeImages === 'true';
     const includeCategories = query.includeCategories === 'true';
     const brandFilters = this.parseCsvFilter(query.brand);
+    const materialTypeFilters = this.parseCsvFilter(query.materialType);
     const finishFilters = this.parseCsvFilter(query.finishType);
     const thicknessFilters = this.parseCsvFilter(query.thickness);
     const colorFilters = this.parseCsvFilter(query.colorName);
+    const descriptionFilters = this.parseMultiValueFilter(query.description);
+    const bookNameFilters = this.parseMultiValueFilter(query.bookName);
+    const pageNumberFilters = this.parseMultiValueFilter(query.pageNumber);
+    const applicationFilters = this.parseMultiValueFilter(query.application);
+    const colorHexFilters = this.parseMultiValueFilter(query.colorHex);
+    const dimensionFilters = this.parseMultiValueFilter(query.dimensions);
+    const withFields = this.parsePresenceFields(query.withFields);
+    const withoutFields = this.parsePresenceFields(query.withoutFields);
 
     const qb = this.productRepository.createQueryBuilder('product');
 
@@ -1001,39 +1035,98 @@ export class ProductService {
       );
     }
 
-    if (brandFilters.length > 0) {
+    this.applyPresenceFilters(qb, withFields, 'with');
+    this.applyPresenceFilters(qb, withoutFields, 'without');
+
+    if (brandFilters.length > 0 && !withoutFields.has('brand')) {
       qb.andWhere('product.brand IN (:...brandFilters)', { brandFilters });
     }
 
-    if (finishFilters.length > 0) {
+    if (materialTypeFilters.length > 0 && !withoutFields.has('materialType')) {
+      qb.andWhere('product.materialType IN (:...materialTypeFilters)', {
+        materialTypeFilters,
+      });
+    }
+
+    if (finishFilters.length > 0 && !withoutFields.has('finishType')) {
       qb.andWhere('product.finishType IN (:...finishFilters)', {
         finishFilters,
       });
     }
 
-    if (thicknessFilters.length > 0) {
+    if (thicknessFilters.length > 0 && !withoutFields.has('thickness')) {
       qb.andWhere('product.thickness IN (:...thicknessFilters)', {
         thicknessFilters,
       });
     }
 
-    if (colorFilters.length > 0) {
+    if (colorFilters.length > 0 && !withoutFields.has('colorName')) {
       qb.andWhere('product.colorName IN (:...colorFilters)', { colorFilters });
+    }
+
+    if (descriptionFilters.length > 0 && !withoutFields.has('description')) {
+      qb.andWhere('product.description IN (:...descriptionFilters)', {
+        descriptionFilters,
+      });
+    }
+
+    if (bookNameFilters.length > 0 && !withoutFields.has('bookName')) {
+      qb.andWhere('product.bookName IN (:...bookNameFilters)', {
+        bookNameFilters,
+      });
+    }
+
+    if (pageNumberFilters.length > 0 && !withoutFields.has('pageNumber')) {
+      qb.andWhere('product.pageNumber IN (:...pageNumberFilters)', {
+        pageNumberFilters,
+      });
+    }
+
+    if (applicationFilters.length > 0 && !withoutFields.has('application')) {
+      qb.andWhere('product.application IN (:...applicationFilters)', {
+        applicationFilters,
+      });
+    }
+
+    if (colorHexFilters.length > 0 && !withoutFields.has('colorHex')) {
+      qb.andWhere('product.colorHex IN (:...colorHexFilters)', {
+        colorHexFilters,
+      });
+    }
+
+    if (dimensionFilters.length > 0 && !withoutFields.has('dimensions')) {
+      qb.andWhere('product.dimensions IN (:...dimensionFilters)', {
+        dimensionFilters,
+      });
     }
 
     const filterRows = await qb
       .clone()
       .select([
         'product.brand AS brand',
+        'product.materialType AS materialType',
         'product.finishType AS finishType',
         'product.thickness AS thickness',
         'product.colorName AS colorName',
+        'product.description AS description',
+        'product.bookName AS bookName',
+        'product.pageNumber AS pageNumber',
+        'product.application AS application',
+        'product.colorHex AS colorHex',
+        'product.dimensions AS dimensions',
       ])
       .getRawMany<{
         brand: string | null;
+        materialType: string | null;
         finishType: string | null;
         thickness: string | null;
         colorName: string | null;
+        description: string | null;
+        bookName: string | null;
+        pageNumber: string | null;
+        application: string | null;
+        colorHex: string | null;
+        dimensions: string | null;
       }>();
 
     const sortByMap: Record<string, string> = {
@@ -1112,17 +1205,82 @@ export class ProductService {
     });
 
     const brands = this.extractCleanFilterValues(filterRows, 'brand');
+    const materialTypes = this.extractCleanFilterValues(
+      filterRows,
+      'materialType',
+    );
     const finishes = this.extractCleanFilterValues(filterRows, 'finishType');
     const thicknesses = this.extractCleanFilterValues(filterRows, 'thickness');
     const colors = this.extractCleanFilterValues(filterRows, 'colorName');
+    const descriptions = this.extractCleanFilterValues(
+      filterRows,
+      'description',
+    );
+    const bookNames = this.extractCleanFilterValues(filterRows, 'bookName');
+    const pageNumbers = this.extractCleanFilterValues(filterRows, 'pageNumber');
+    const applications = this.extractCleanFilterValues(
+      filterRows,
+      'application',
+    );
+    const colorHexes = this.extractCleanFilterValues(filterRows, 'colorHex');
+    const dimensions = this.extractCleanFilterValues(filterRows, 'dimensions');
 
     return {
       items,
       total,
       page,
       limit,
-      filters: { finishes, brands, thicknesses, colors },
+      filters: {
+        finishes,
+        brands,
+        materialTypes,
+        thicknesses,
+        colors,
+        descriptions,
+        bookNames,
+        pageNumbers,
+        applications,
+        colorHexes,
+        dimensions,
+      },
     };
+  }
+
+  private static readonly PRESENCE_FIELD_COLUMNS: Record<string, string> = {
+    brand: 'product.brand',
+    materialType: 'product.materialType',
+    finishType: 'product.finishType',
+    thickness: 'product.thickness',
+    colorName: 'product.colorName',
+    description: 'product.description',
+    bookName: 'product.bookName',
+    pageNumber: 'product.pageNumber',
+    application: 'product.application',
+    colorHex: 'product.colorHex',
+    dimensions: 'product.dimensions',
+  };
+
+  private parsePresenceFields(value?: string): Set<string> {
+    const allowed = new Set(Object.keys(ProductService.PRESENCE_FIELD_COLUMNS));
+    return new Set(
+      this.parseCsvFilter(value).filter((field) => allowed.has(field)),
+    );
+  }
+
+  private applyPresenceFilters(
+    qb: SelectQueryBuilder<Product>,
+    fields: Set<string>,
+    mode: 'with' | 'without',
+  ): void {
+    for (const field of fields) {
+      const column = ProductService.PRESENCE_FIELD_COLUMNS[field];
+      if (!column) continue;
+      if (mode === 'without') {
+        qb.andWhere(`(${column} IS NULL OR TRIM(${column}) = '')`);
+      } else {
+        qb.andWhere(`(${column} IS NOT NULL AND TRIM(${column}) <> '')`);
+      }
+    }
   }
 
   private parseCsvFilter(value?: string): string[] {
@@ -1137,6 +1295,29 @@ export class ProductService {
           .filter(Boolean),
       ),
     );
+  }
+
+  /** Accepts CSV or JSON string array (safer for values that contain commas). */
+  private parseMultiValueFilter(value?: string): string[] {
+    if (!value) {
+      return [];
+    }
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed: unknown = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return Array.from(
+            new Set(
+              parsed.map((item) => String(item ?? '').trim()).filter(Boolean),
+            ),
+          );
+        }
+      } catch {
+        // fall through to CSV parsing
+      }
+    }
+    return this.parseCsvFilter(trimmed);
   }
 
   private extractCleanFilterValues<T extends Record<string, string | null>>(
