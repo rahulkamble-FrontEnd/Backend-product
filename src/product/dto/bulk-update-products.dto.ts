@@ -24,6 +24,22 @@ export class BulkUpdateProductsDto {
 
   @IsOptional()
   @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  bookName?: string;
+
+  @IsOptional()
+  @IsString()
+  pageNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  application?: string;
+
+  @IsOptional()
+  @IsString()
   materialType?: string;
 
   @IsOptional()
@@ -33,6 +49,10 @@ export class BulkUpdateProductsDto {
   @IsOptional()
   @IsString()
   colorName?: string;
+
+  @IsOptional()
+  @IsString()
+  colorHex?: string;
 
   @IsOptional()
   @IsString()
@@ -52,5 +72,24 @@ export class BulkUpdateProductsDto {
 
   @IsOptional()
   @IsNumber()
+  priceCategory?: number;
+
+  @IsOptional()
+  @IsNumber()
   maintenanceRating?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  bestUsedFor?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  pros?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  cons?: string[];
 }

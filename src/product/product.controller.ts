@@ -79,8 +79,15 @@ export class ProductController {
     filters: {
       finishes: string[];
       brands: string[];
+      materialTypes: string[];
       thicknesses: string[];
       colors: string[];
+      descriptions: string[];
+      bookNames: string[];
+      pageNumbers: string[];
+      applications: string[];
+      colorHexes: string[];
+      dimensions: string[];
     };
   }> {
     return this.productService.listProducts(query, req.user?.role);
