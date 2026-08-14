@@ -30,7 +30,7 @@ export class TagsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post()
   async create(
     @Body() dto: CreateTagDto,
@@ -40,7 +40,7 @@ export class TagsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Put(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -50,7 +50,7 @@ export class TagsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Delete(':id')
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
