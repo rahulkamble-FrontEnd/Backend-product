@@ -71,7 +71,7 @@ export class CategoryController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post()
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
@@ -80,7 +80,7 @@ export class CategoryController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Post(':id/subcategories')
   async createSubcategory(
     @Param('id', ParseUUIDPipe) categoryId: string,
@@ -93,7 +93,7 @@ export class CategoryController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Put(':id')
   async update(
     @Param('id') id: string,
@@ -103,7 +103,7 @@ export class CategoryController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Put(':categoryId/subcategories/:subCategoryId')
   async updateSubcategory(
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
@@ -118,14 +118,14 @@ export class CategoryController {
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     return this.categoryService.deactivate(id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.DATAADMIN)
   @Delete(':categoryId/subcategories/:subCategoryId')
   async removeSubcategory(
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
