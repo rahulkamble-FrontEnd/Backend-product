@@ -333,7 +333,13 @@ export class ProductService {
       name: string;
     }> = [];
     const errors: Array<{ row: number; sku?: string; message: string }> = [];
-    const zipImagesBySku = this.buildZipImagesBySku(imagesZipFile);
+
+    const knownSkuKeys = new Set<string>();
+    for (const row of rawRows) {
+      const sku = this.extractSkuFromRow(row);
+      if (sku) knownSkuKeys.add(this.normalizeBulkImageSkuKey(sku));
+    }
+    const zipImagesBySku = this.buildZipImagesBySku(imagesZipFile, knownSkuKeys);
 
     const uploadedS3Keys: string[] = [];
 
@@ -417,6 +423,7 @@ export class ProductService {
 
   private buildZipImagesBySku(
     imagesZipFile: Express.Multer.File | undefined,
+    knownSkuKeys?: Set<string>,
   ): Map<string, Array<{ sequence: number; fileName: string; file: Buffer }>> {
     const imagesBySku = new Map<
       string,
@@ -440,7 +447,7 @@ export class ProductService {
         continue;
       }
 
-      const parsed = this.parseBulkImageFileName(fileName);
+      const parsed = this.parseBulkImageFileName(fileName, knownSkuKeys);
       if (!parsed) {
         continue;
       }
@@ -472,9 +479,37 @@ export class ProductService {
 
   private parseBulkImageFileName(
     fileName: string,
+    knownSkuKeys?: Set<string>,
   ): { sku: string; sequence: number } | null {
-    // Accept both "SKU.jpg" (single image) and "SKU-1.jpg" (explicit order).
-    const withSequence = /^(.+)-(\d+)\.(jpe?g|png|webp)$/i.exec(fileName);
+    const extMatch = /^(.+)\.(jpe?g|png|webp)$/i.exec(fileName);
+    if (!extMatch) return null;
+    const baseName = extMatch[1].trim();
+    if (!baseName) return null;
+
+    if (knownSkuKeys && knownSkuKeys.size > 0) {
+      const normalizedBase = this.normalizeBulkImageSkuKey(baseName);
+      if (knownSkuKeys.has(normalizedBase)) {
+        return { sku: baseName, sequence: 1 };
+      }
+
+      const withSequence = /^(.+)-(\d+)$/.exec(baseName);
+      if (withSequence) {
+        const candidateSku = withSequence[1].trim();
+        const sequence = Number(withSequence[2]);
+        if (
+          candidateSku &&
+          Number.isInteger(sequence) &&
+          sequence > 0 &&
+          knownSkuKeys.has(this.normalizeBulkImageSkuKey(candidateSku))
+        ) {
+          return { sku: candidateSku, sequence };
+        }
+      }
+
+      return null;
+    }
+
+    const withSequence = /^(.+)-(\d+)$/i.exec(baseName);
     if (withSequence) {
       const sequence = Number(withSequence[2]);
       if (!Number.isInteger(sequence) || sequence <= 0) {
@@ -483,12 +518,7 @@ export class ProductService {
       return { sku: withSequence[1].trim(), sequence };
     }
 
-    const singleImage = /^(.+)\.(jpe?g|png|webp)$/i.exec(fileName);
-    if (!singleImage) {
-      return null;
-    }
-
-    return { sku: singleImage[1].trim(), sequence: 1 };
+    return { sku: baseName.trim(), sequence: 1 };
   }
 
   private getMimeTypeFromFileName(fileName: string): string {
