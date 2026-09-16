@@ -339,7 +339,10 @@ export class ProductService {
       const sku = this.extractSkuFromRow(row);
       if (sku) knownSkuKeys.add(this.normalizeBulkImageSkuKey(sku));
     }
-    const zipImagesBySku = this.buildZipImagesBySku(imagesZipFile, knownSkuKeys);
+    const zipImagesBySku = this.buildZipImagesBySku(
+      imagesZipFile,
+      knownSkuKeys,
+    );
 
     const uploadedS3Keys: string[] = [];
 
@@ -1315,10 +1318,19 @@ export class ProductService {
     for (const field of fields) {
       const column = ProductService.PRESENCE_FIELD_COLUMNS[field];
       if (!column) continue;
+      // Treat placeholder "NOT AVAILABLE" as empty for description presence.
+      const emptyExpr =
+        field === 'description'
+          ? `(${column} IS NULL OR TRIM(${column}) = '' OR UPPER(TRIM(${column})) = 'NOT AVAILABLE')`
+          : `(${column} IS NULL OR TRIM(${column}) = '')`;
+      const presentExpr =
+        field === 'description'
+          ? `(${column} IS NOT NULL AND TRIM(${column}) <> '' AND UPPER(TRIM(${column})) <> 'NOT AVAILABLE')`
+          : `(${column} IS NOT NULL AND TRIM(${column}) <> '')`;
       if (mode === 'without') {
-        qb.andWhere(`(${column} IS NULL OR TRIM(${column}) = '')`);
+        qb.andWhere(emptyExpr);
       } else {
-        qb.andWhere(`(${column} IS NOT NULL AND TRIM(${column}) <> '')`);
+        qb.andWhere(presentExpr);
       }
     }
   }
