@@ -1970,7 +1970,7 @@ export class ProductService {
 
     const tag = await this.tagRepository.findOne({
       where: { id: tagId },
-      select: ['id'],
+      select: ['id', 'name', 'hexCode'],
     });
     if (!tag) {
       throw new NotFoundException(`Tag with id "${tagId}" not found`);
@@ -1980,19 +1980,22 @@ export class ProductService {
       where: { productId, tagId },
       select: ['id'],
     });
-    if (existing) {
-      return {
-        message: `Tag "${tagId}" is already linked to product "${productId}"`,
-        linked: false,
-      };
+
+    let linked = false;
+    if (!existing) {
+      const entity = this.productTagRepository.create({ productId, tagId });
+      await this.productTagRepository.save(entity);
+      linked = true;
     }
 
-    const entity = this.productTagRepository.create({ productId, tagId });
-    await this.productTagRepository.save(entity);
+    // Option A: applying a tag also sets the product color (last applied wins).
+    await this.applyTagColorToProduct(productId, tag);
 
     return {
-      message: `Tag "${tagId}" linked to product "${productId}"`,
-      linked: true,
+      message: linked
+        ? `Tag "${tagId}" linked to product "${productId}"`
+        : `Tag "${tagId}" is already linked to product "${productId}"`,
+      linked,
     };
   }
 
@@ -2043,7 +2046,47 @@ export class ProductService {
       );
     }
 
+    // Refresh color from remaining tags, or clear if none left.
+    await this.syncProductColorFromLinkedTags(productId);
+
     return { message: `Tag "${tagId}" unlinked from product "${productId}"` };
+  }
+
+  private async applyTagColorToProduct(
+    productId: string,
+    tag: Pick<Tag, 'name' | 'hexCode'>,
+  ): Promise<void> {
+    await this.productRepository.update(productId, {
+      colorName: tag.name.trim(),
+      colorHex: tag.hexCode.trim().toUpperCase(),
+    });
+  }
+
+  private async syncProductColorFromLinkedTags(
+    productId: string,
+  ): Promise<void> {
+    const links = await this.productTagRepository.find({
+      where: { productId },
+      relations: { tag: true },
+      order: { id: 'DESC' },
+      take: 1,
+    });
+
+    const latestTag = links[0]?.tag;
+    if (latestTag) {
+      await this.applyTagColorToProduct(productId, latestTag);
+      return;
+    }
+
+    await this.productRepository
+      .createQueryBuilder()
+      .update(Product)
+      .set({
+        colorName: () => 'NULL',
+        colorHex: () => 'NULL',
+      })
+      .where('id = :productId', { productId })
+      .execute();
   }
 
   private buildCreateProductDtoFromRow(
