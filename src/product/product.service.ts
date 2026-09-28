@@ -1031,13 +1031,18 @@ export class ProductService {
         relations: ['parent'],
       });
 
-      if (requestedCategory && !requestedCategory.parent) {
+      if (!requestedCategory || !requestedCategory.isActive) {
+        qb.andWhere('1 = 0');
+      } else if (!requestedCategory.parent) {
         const childCategoryRows = await this.categoryRepository
           .createQueryBuilder('childCategory')
           .leftJoin('childCategory.parent', 'parentCategory')
           .select('childCategory.id', 'id')
           .where('parentCategory.id = :parentId', {
             parentId: query.categoryId,
+          })
+          .andWhere('childCategory.is_active = :childActive', {
+            childActive: true,
           })
           .getRawMany<{ id: string }>();
 

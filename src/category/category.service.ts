@@ -60,10 +60,24 @@ export class CategoryService {
   }
 
   async findBySlug(slug: string): Promise<Category | null> {
-    return this.categoryRepository.findOne({
+    const category = await this.categoryRepository.findOne({
       where: { slug, isActive: true },
-      relations: ['children'],
     });
+    if (!category) {
+      return null;
+    }
+
+    // Deactivate only sets is_active = false. Do not send those children
+    // to the public sub-category chips.
+    category.children = await this.categoryRepository.find({
+      where: {
+        parent: { id: category.id },
+        isActive: true,
+      },
+      order: { displayOrder: 'ASC', name: 'ASC' },
+    });
+
+    return category;
   }
 
   async findSubcategories(parentId: string): Promise<Category[]> {
