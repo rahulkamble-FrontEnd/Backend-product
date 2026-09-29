@@ -82,6 +82,10 @@ export class ListProductsQueryDto {
 
   @IsOptional()
   @IsString()
+  watt?: string;
+
+  @IsOptional()
+  @IsString()
   colorName?: string;
 
   @IsOptional()
