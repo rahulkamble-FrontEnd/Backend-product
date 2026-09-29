@@ -81,6 +81,7 @@ export class ProductController {
       brands: string[];
       materialTypes: string[];
       thicknesses: string[];
+      watts: string[];
       colors: string[];
       descriptions: string[];
       bookNames: string[];

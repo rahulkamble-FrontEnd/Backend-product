@@ -595,6 +595,7 @@ export class ProductService {
     if (dto.colorName !== undefined) updateData.colorName = dto.colorName;
     if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex;
     if (dto.thickness !== undefined) updateData.thickness = dto.thickness;
+    if (dto.watt !== undefined) updateData.watt = dto.watt;
     if (dto.dimensions !== undefined) updateData.dimensions = dto.dimensions;
     if (dto.performanceRating !== undefined)
       updateData.performanceRating = dto.performanceRating;
@@ -650,6 +651,7 @@ export class ProductService {
     if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex.trim();
     if (dto.thickness !== undefined)
       updateData.thickness = dto.thickness.trim();
+    if (dto.watt !== undefined) updateData.watt = dto.watt.trim();
     if (dto.dimensions !== undefined)
       updateData.dimensions = dto.dimensions.trim();
     if (dto.performanceRating !== undefined)
@@ -886,6 +888,9 @@ export class ProductService {
     const thickness = this.toOptionalString(normalizedRow.thickness);
     if (thickness !== undefined) updateData.thickness = thickness;
 
+    const watt = this.toOptionalString(normalizedRow.watt);
+    if (watt !== undefined) updateData.watt = watt;
+
     const dimensions = this.toOptionalString(normalizedRow.dimensions);
     if (dimensions !== undefined) updateData.dimensions = dimensions;
 
@@ -952,6 +957,7 @@ export class ProductService {
       brands: string[];
       materialTypes: string[];
       thicknesses: string[];
+      watts: string[];
       colors: string[];
       descriptions: string[];
       bookNames: string[];
@@ -970,6 +976,7 @@ export class ProductService {
     const materialTypeFilters = this.parseCsvFilter(query.materialType);
     const finishFilters = this.parseCsvFilter(query.finishType);
     const thicknessFilters = this.parseCsvFilter(query.thickness);
+    const wattFilters = this.parseCsvFilter(query.watt);
     const colorFilters = this.parseCsvFilter(query.colorName);
     const descriptionFilters = this.parseMultiValueFilter(query.description);
     const bookNameFilters = this.parseMultiValueFilter(query.bookName);
@@ -1108,6 +1115,10 @@ export class ProductService {
       });
     }
 
+    if (wattFilters.length > 0 && !withoutFields.has('watt')) {
+      qb.andWhere('product.watt IN (:...wattFilters)', { wattFilters });
+    }
+
     if (colorFilters.length > 0 && !withoutFields.has('colorName')) {
       qb.andWhere('product.colorName IN (:...colorFilters)', { colorFilters });
     }
@@ -1155,6 +1166,7 @@ export class ProductService {
         'product.materialType AS materialType',
         'product.finishType AS finishType',
         'product.thickness AS thickness',
+        'product.watt AS watt',
         'product.colorName AS colorName',
         'product.description AS description',
         'product.bookName AS bookName',
@@ -1168,6 +1180,7 @@ export class ProductService {
         materialType: string | null;
         finishType: string | null;
         thickness: string | null;
+        watt: string | null;
         colorName: string | null;
         description: string | null;
         bookName: string | null;
@@ -1209,6 +1222,7 @@ export class ProductService {
         colorName: p.colorName,
         colorHex: p.colorHex,
         thickness: p.thickness,
+        watt: p.watt,
         dimensions: p.dimensions,
         performanceRating: p.performanceRating,
         durabilityRating: p.durabilityRating,
@@ -1259,6 +1273,7 @@ export class ProductService {
     );
     const finishes = this.extractCleanFilterValues(filterRows, 'finishType');
     const thicknesses = this.extractCleanFilterValues(filterRows, 'thickness');
+    const watts = this.extractCleanFilterValues(filterRows, 'watt');
     const colors = this.extractCleanFilterValues(filterRows, 'colorName');
     const descriptions = this.extractCleanFilterValues(
       filterRows,
@@ -1283,6 +1298,7 @@ export class ProductService {
         brands,
         materialTypes,
         thicknesses,
+        watts,
         colors,
         descriptions,
         bookNames,
@@ -1299,6 +1315,7 @@ export class ProductService {
     materialType: 'product.materialType',
     finishType: 'product.finishType',
     thickness: 'product.thickness',
+    watt: 'product.watt',
     colorName: 'product.colorName',
     description: 'product.description',
     bookName: 'product.bookName',
@@ -1434,6 +1451,7 @@ export class ProductService {
       colorName: product.colorName,
       colorHex: product.colorHex,
       thickness: product.thickness,
+      watt: product.watt,
       dimensions: product.dimensions,
       performanceRating: product.performanceRating,
       durabilityRating: product.durabilityRating,
@@ -1536,6 +1554,7 @@ export class ProductService {
         colorName: p.colorName,
         colorHex: p.colorHex,
         thickness: p.thickness,
+        watt: p.watt,
         dimensions: p.dimensions,
         performanceRating: p.performanceRating,
         durabilityRating: p.durabilityRating,
@@ -1635,6 +1654,7 @@ export class ProductService {
         finishType: p.finishType,
         colorName: p.colorName,
         thickness: p.thickness,
+        watt: p.watt,
         dimensions: p.dimensions,
         performanceRating: p.performanceRating,
         durabilityRating: p.durabilityRating,
@@ -1668,6 +1688,7 @@ export class ProductService {
       { key: 'finishType', values: normalized.map((p) => p.finishType) },
       { key: 'colorName', values: normalized.map((p) => p.colorName) },
       { key: 'thickness', values: normalized.map((p) => p.thickness) },
+      { key: 'watt', values: normalized.map((p) => p.watt) },
       { key: 'dimensions', values: normalized.map((p) => p.dimensions) },
       {
         key: 'performanceRating',
@@ -2142,6 +2163,7 @@ export class ProductService {
       colorName: this.toOptionalString(normalizedRow.colorname),
       colorHex: this.toOptionalString(normalizedRow.colorhex),
       thickness: this.toOptionalString(normalizedRow.thickness),
+      watt: this.toOptionalString(normalizedRow.watt),
       dimensions: this.toOptionalString(normalizedRow.dimensions),
       performanceRating: this.toOptionalNumber(normalizedRow.performancerating),
       durabilityRating: this.toOptionalNumber(normalizedRow.durabilityrating),
