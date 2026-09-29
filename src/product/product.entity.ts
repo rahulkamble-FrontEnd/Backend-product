@@ -67,6 +67,9 @@ export class Product {
   thickness: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
+  watt: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
   dimensions: string;
 
   @Column({ name: 'performance_rating', type: 'tinyint', default: 0 })

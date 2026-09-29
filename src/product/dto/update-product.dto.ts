@@ -65,6 +65,10 @@ export class UpdateProductDto {
 
   @IsString()
   @IsOptional()
+  watt?: string;
+
+  @IsString()
+  @IsOptional()
   dimensions?: string;
 
   @IsNumber()

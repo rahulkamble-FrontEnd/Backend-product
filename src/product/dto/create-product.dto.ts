@@ -62,6 +62,10 @@ export class CreateProductDto {
 
   @IsString()
   @IsOptional()
+  watt?: string;
+
+  @IsString()
+  @IsOptional()
   dimensions?: string;
 
   @IsNumber()

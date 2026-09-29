@@ -60,6 +60,10 @@ export class BulkUpdateProductsDto {
 
   @IsOptional()
   @IsString()
+  watt?: string;
+
+  @IsOptional()
+  @IsString()
   dimensions?: string;
 
   @IsOptional()
