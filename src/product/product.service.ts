@@ -46,6 +46,7 @@ export class ProductService {
     finishes: 'FN',
     lighting: 'LT',
     'wall-decorative': 'WD',
+    'wall-decoratives': 'WD',
   };
 
   constructor(
