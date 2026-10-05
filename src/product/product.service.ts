@@ -108,6 +108,9 @@ export class ProductService {
     if (productData.status === 'published') {
       productData.status = 'active';
     }
+    if (typeof productData.thickness === 'string') {
+      productData.thickness = this.normalizeThickness(productData.thickness);
+    }
 
     return this.productRepository.manager.transaction(async (manager) => {
       const txProductRepository = manager.getRepository(Product);
@@ -188,6 +191,9 @@ export class ProductService {
 
     if (productData.status === 'published') {
       productData.status = 'active';
+    }
+    if (typeof productData.thickness === 'string') {
+      productData.thickness = this.normalizeThickness(productData.thickness);
     }
 
     const slug = await this.buildProductSlug(
@@ -595,7 +601,12 @@ export class ProductService {
     if (dto.finishType !== undefined) updateData.finishType = dto.finishType;
     if (dto.colorName !== undefined) updateData.colorName = dto.colorName;
     if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex;
-    if (dto.thickness !== undefined) updateData.thickness = dto.thickness;
+    if (dto.thickness !== undefined) {
+      updateData.thickness =
+        typeof dto.thickness === 'string'
+          ? this.normalizeThickness(dto.thickness)
+          : dto.thickness;
+    }
     if (dto.watt !== undefined) updateData.watt = dto.watt;
     if (dto.dimensions !== undefined) updateData.dimensions = dto.dimensions;
     if (dto.performanceRating !== undefined)
@@ -650,8 +661,9 @@ export class ProductService {
     if (dto.colorName !== undefined)
       updateData.colorName = dto.colorName.trim();
     if (dto.colorHex !== undefined) updateData.colorHex = dto.colorHex.trim();
-    if (dto.thickness !== undefined)
-      updateData.thickness = dto.thickness.trim();
+    if (typeof dto.thickness === 'string') {
+      updateData.thickness = this.normalizeThickness(dto.thickness);
+    }
     if (dto.watt !== undefined) updateData.watt = dto.watt.trim();
     if (dto.dimensions !== undefined)
       updateData.dimensions = dto.dimensions.trim();
@@ -887,7 +899,9 @@ export class ProductService {
     }
 
     const thickness = this.toOptionalString(normalizedRow.thickness);
-    if (thickness !== undefined) updateData.thickness = thickness;
+    if (thickness !== undefined) {
+      updateData.thickness = this.normalizeThickness(thickness);
+    }
 
     const watt = this.toOptionalString(normalizedRow.watt);
     if (watt !== undefined) updateData.watt = watt;
@@ -2163,7 +2177,9 @@ export class ProductService {
       finishType: this.toOptionalString(normalizedRow.finishtype),
       colorName: this.toOptionalString(normalizedRow.colorname),
       colorHex: this.toOptionalString(normalizedRow.colorhex),
-      thickness: this.toOptionalString(normalizedRow.thickness),
+      thickness: this.normalizeOptionalThickness(
+        this.toOptionalString(normalizedRow.thickness),
+      ),
       watt: this.toOptionalString(normalizedRow.watt),
       dimensions: this.toOptionalString(normalizedRow.dimensions),
       performanceRating: this.toOptionalNumber(normalizedRow.performancerating),
@@ -2190,6 +2206,19 @@ export class ProductService {
       return this.toOptionalString(value);
     }
     return undefined;
+  }
+
+  /** "12 MM" and "12mm" both become "12MM". Blank stays blank. "(5+5)" is kept. */
+  private normalizeThickness(value: string): string {
+    return value.trim().toUpperCase().replace(/\s+/g, '');
+  }
+
+  private normalizeOptionalThickness(
+    value: string | undefined,
+  ): string | undefined {
+    if (value === undefined) return undefined;
+    const normalized = this.normalizeThickness(value);
+    return normalized.length > 0 ? normalized : undefined;
   }
 
   private toOptionalString(value: unknown): string | undefined {
