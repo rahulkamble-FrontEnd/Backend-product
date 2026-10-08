@@ -8,6 +8,7 @@ import { CategoryModule } from './category/category.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductModule } from './product/product.module';
 import { ShortlistModule } from './shortlist/shortlist.module';
+import { WishlistModule } from './wishlist/wishlist.module';
 import { NotificationModule } from './notification/notification.module';
 import { BlogModule } from './blog/blog.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
@@ -68,6 +69,7 @@ import { SubscribeModule } from './subscribe/subscribe.module';
     CategoryModule,
     ProductModule,
     ShortlistModule,
+    WishlistModule,
     NotificationModule,
     BlogModule,
     PortfolioModule,
