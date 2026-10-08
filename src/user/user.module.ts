@@ -7,6 +7,7 @@ import { DesignerNote } from './designer-note.entity';
 import { DesignerRecommendation } from './designer-recommendation.entity';
 import { DesignerController } from './designer.controller';
 import { Shortlist } from '../shortlist/shortlist.entity';
+import { Wishlist } from '../wishlist/wishlist.entity';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Shortlist } from '../shortlist/shortlist.entity';
       DesignerNote,
       DesignerRecommendation,
       Shortlist,
+      Wishlist,
     ]),
   ],
   providers: [UserService],
