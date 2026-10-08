@@ -14,6 +14,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { DesignerNote } from './designer-note.entity';
 import { DesignerRecommendation } from './designer-recommendation.entity';
 import { Shortlist } from '../shortlist/shortlist.entity';
+import { Wishlist } from '../wishlist/wishlist.entity';
 @Injectable()
 export class UserService {
   constructor(
@@ -25,6 +26,8 @@ export class UserService {
     private designerRecommendationsRepository: Repository<DesignerRecommendation>,
     @InjectRepository(Shortlist)
     private shortlistRepository: Repository<Shortlist>,
+    @InjectRepository(Wishlist)
+    private wishlistRepository: Repository<Wishlist>,
   ) {}
 
   private sanitizeUser(user: User): User {
@@ -166,6 +169,7 @@ export class UserService {
     >;
     notes: DesignerNote[];
     recommendations: DesignerRecommendation[];
+    wishlist: Wishlist[];
   }> {
     const customer = await this.usersRepository.findOne({
       where: { id: customerId, role: UserRole.CUSTOMER },
@@ -220,6 +224,14 @@ export class UserService {
       return acc;
     }, {});
 
+    const wishlist = await this.wishlistRepository
+      .createQueryBuilder('wishlist')
+      .leftJoinAndSelect('wishlist.product', 'wishlistProduct')
+      .leftJoinAndSelect('wishlistProduct.images', 'wishlistImages')
+      .where('wishlist.customerId = :customerId', { customerId })
+      .orderBy('wishlist.createdAt', 'DESC')
+      .getMany();
+
     const shortlistWithRecommendations = shortlist.map((item) => ({
       ...item,
       recommendations: recommendationsByProductId[item.productId] ?? [],
@@ -230,6 +242,7 @@ export class UserService {
       shortlist: shortlistWithRecommendations,
       notes,
       recommendations,
+      wishlist,
     };
   }
 
