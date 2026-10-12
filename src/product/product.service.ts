@@ -1660,10 +1660,7 @@ export class ProductService {
         name: p.name,
         slug: p.slug,
         sku: p.sku,
-        imsId: p.imsId,
         description: p.description,
-        bookName: p.bookName,
-        pageNumber: p.pageNumber,
         application: p.application,
         materialType: p.materialType,
         finishType: p.finishType,
@@ -1688,16 +1685,28 @@ export class ProductService {
 
       if (!hideBrand) {
         item.brand = p.brand;
+        item.imsId = p.imsId;
+        item.bookName = p.bookName;
+        item.pageNumber = p.pageNumber;
       }
 
       return item;
     });
 
     const fields = [
-      { key: 'imsId', values: normalized.map((p) => p.imsId) },
+      ...(hideBrand
+        ? []
+        : [{ key: 'brand', values: normalized.map((p) => p.brand) }]),
+      ...(hideBrand
+        ? []
+        : [{ key: 'imsId', values: normalized.map((p) => p.imsId) }]),
       { key: 'name', values: normalized.map((p) => p.name) },
-      { key: 'bookName', values: normalized.map((p) => p.bookName) },
-      { key: 'pageNumber', values: normalized.map((p) => p.pageNumber) },
+      ...(hideBrand
+        ? []
+        : [
+            { key: 'bookName', values: normalized.map((p) => p.bookName) },
+            { key: 'pageNumber', values: normalized.map((p) => p.pageNumber) },
+          ]),
       { key: 'application', values: normalized.map((p) => p.application) },
       { key: 'materialType', values: normalized.map((p) => p.materialType) },
       { key: 'finishType', values: normalized.map((p) => p.finishType) },
@@ -1720,11 +1729,7 @@ export class ProductService {
       },
     ];
 
-    const visibleFields = hideBrand
-      ? fields
-      : [{ key: 'brand', values: normalized.map((p) => p.brand) }, ...fields];
-
-    return { ids, missingIds, products: normalized, fields: visibleFields };
+    return { ids, missingIds, products: normalized, fields };
   }
 
   async deleteProductPermanently(
