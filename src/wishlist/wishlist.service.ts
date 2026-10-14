@@ -81,6 +81,11 @@ export class WishlistService {
     return { message: 'Removed from wishlist.' };
   }
 
+  async clear(customerId: string): Promise<{ message: string }> {
+    await this.wishlistRepository.delete({ customerId });
+    return { message: 'Wishlist cleared.' };
+  }
+
   private isDuplicate(error: unknown): boolean {
     return (
       error instanceof QueryFailedError &&
