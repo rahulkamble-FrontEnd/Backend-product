@@ -41,6 +41,15 @@ export class WishlistController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.CUSTOMER)
+  @Delete()
+  async clear(
+    @Request() req: AuthenticatedRequest,
+  ): Promise<{ message: string }> {
+    return this.wishlistService.clear(req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.CUSTOMER)
   @Delete('product/:productId')
   async removeByProduct(
     @Param('productId', ParseUUIDPipe) productId: string,
