@@ -9,7 +9,7 @@ import { Product } from '../product/product.entity';
 import { AddWishlistItemDto } from './dto/add-wishlist-item.dto';
 import { Wishlist } from './wishlist.entity';
 
-const WISHLIST_ITEM_LIMIT = 25;
+const WISHLIST_ITEM_LIMIT = 15;
 
 @Injectable()
 export class WishlistService {
@@ -37,7 +37,9 @@ export class WishlistService {
       where: { customerId },
     });
     if (savedCount >= WISHLIST_ITEM_LIMIT) {
-      throw new BadRequestException('You can wishlist only 25 products.');
+      throw new BadRequestException(
+        `You can wishlist only ${WISHLIST_ITEM_LIMIT} products.`,
+      );
     }
 
     try {
