@@ -2384,7 +2384,7 @@ export class ProductService {
     code: string,
   ): string | null {
     if (!slug) return null;
-    const match = slug.match(new RegExp(`-${code}(\\d{4})$`, 'i'));
+    const match = slug.match(new RegExp(`-${code}(\\d{4,})$`, 'i'));
     return match?.[1] ?? null;
   }
 
@@ -2400,13 +2400,13 @@ export class ProductService {
       .createQueryBuilder('p')
       .select(['p.slug'])
       .where('p.slug REGEXP :pattern', {
-        pattern: `-${code}[0-9]{4}$`,
+        pattern: `-${code}[0-9]{4,}$`,
       })
       .withDeleted()
       .getMany();
 
     let max = 0;
-    const serialPattern = new RegExp(`-${code}(\\d{4})$`, 'i');
+    const serialPattern = new RegExp(`-${code}(\\d{4,})$`, 'i');
     for (const row of rows) {
       const match = row.slug?.match(serialPattern);
       if (!match) continue;
@@ -2416,7 +2416,7 @@ export class ProductService {
       }
     }
 
-    if (max >= 9999) {
+    if (max >= 99999999) {
       throw new BadRequestException(
         `Slug serial limit reached for category code ${code}`,
       );
