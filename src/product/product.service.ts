@@ -29,6 +29,17 @@ import { UserRole } from '../user/dto/create-user.dto';
 import { ProductTag } from './product-tag.entity';
 import { Tag } from '../tags/tag.entity';
 import type { AuthUser } from '../auth/types/auth-user.type';
+import { PRODUCT_CONTENT_DEFAULTS } from './product-content-defaults';
+
+const PLACEHOLDER_CONTENT_VALUES = new Set([
+  '',
+  '-',
+  'na',
+  'n/a',
+  'nil',
+  'none',
+  'not available',
+]);
 
 @Injectable()
 export class ProductService {
@@ -111,6 +122,7 @@ export class ProductService {
     if (typeof productData.thickness === 'string') {
       productData.thickness = this.normalizeThickness(productData.thickness);
     }
+    this.applyContentDefaults(productData, existingCategories);
 
     return this.productRepository.manager.transaction(async (manager) => {
       const txProductRepository = manager.getRepository(Product);
@@ -195,6 +207,7 @@ export class ProductService {
     if (typeof productData.thickness === 'string') {
       productData.thickness = this.normalizeThickness(productData.thickness);
     }
+    this.applyContentDefaults(productData, existingCategories);
 
     const slug = await this.buildProductSlug(
       productData.name,
@@ -2214,6 +2227,68 @@ export class ProductService {
   }
 
   /** "12 MM" and "12mm" both become "12MM". Blank stays blank. "(5+5)" is kept. */
+  /**
+   * Fills description, pros, cons, and application from PRODUCT_CONTENT_DEFAULTS
+   * when they are missing or a placeholder. Values given in the request are kept.
+   */
+  private applyContentDefaults(
+    productData: Pick<
+      CreateProductDto,
+      'description' | 'pros' | 'cons' | 'application' | 'thickness'
+    >,
+    categories: Category[],
+  ): void {
+    const normalizeKey = (value: string | null | undefined) =>
+      (value ?? '')
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[-_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const thicknessMm = Number.parseFloat(
+      (productData.thickness ?? '').replace(/mm/gi, ''),
+    );
+
+    const match = PRODUCT_CONTENT_DEFAULTS.find((entry) =>
+      categories.some((category) => {
+        const parentSlug = (category.parent?.slug ?? '').trim().toLowerCase();
+        if (!entry.parents.includes(parentSlug)) return false;
+        const subKeys = [
+          normalizeKey(category.name),
+          normalizeKey(category.slug),
+        ];
+        if (!entry.subcategories.some((sub) => subKeys.includes(sub))) {
+          return false;
+        }
+        if (entry.thicknessMm === undefined) return true;
+        return (
+          Number.isFinite(thicknessMm) &&
+          Math.abs(thicknessMm - entry.thicknessMm) < 0.001
+        );
+      }),
+    );
+    if (!match) return;
+
+    const isPlaceholder = (value: string | undefined) =>
+      PLACEHOLDER_CONTENT_VALUES.has((value ?? '').trim().toLowerCase());
+    const isEmptyList = (value: string[] | undefined) =>
+      !Array.isArray(value) ||
+      value.every((item) => isPlaceholder(String(item ?? '')));
+
+    if (isPlaceholder(productData.description)) {
+      productData.description = match.description;
+    }
+    if (isPlaceholder(productData.application)) {
+      productData.application = match.application;
+    }
+    if (isEmptyList(productData.pros)) {
+      productData.pros = [...match.pros];
+    }
+    if (isEmptyList(productData.cons)) {
+      productData.cons = [...match.cons];
+    }
+  }
+
   private normalizeThickness(value: string): string {
     return value.trim().toUpperCase().replace(/\s+/g, '');
   }
