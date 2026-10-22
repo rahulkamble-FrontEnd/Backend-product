@@ -17,6 +17,7 @@ import { TagsModule } from './tags/tags.module';
 import { DesignCfModule } from './design-cf/design-cf.module';
 import { DbTransientRetryInterceptor } from './common/interceptors/db-transient-retry.interceptor';
 import { SubscribeModule } from './subscribe/subscribe.module';
+import { DeleteLogModule } from './delete-log/delete-log.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { SubscribeModule } from './subscribe/subscribe.module';
     TagsModule,
     DesignCfModule,
     SubscribeModule,
+    DeleteLogModule,
   ],
   controllers: [AppController],
   providers: [

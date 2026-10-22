@@ -123,9 +123,16 @@ export const PRODUCT_CONTENT_DEFAULTS: ProductContentDefault[] = [
     subcategories: ['granite'],
     description:
       'Natural stone countertop material with unique grains and colour variation.',
-    pros: ['Natural appearance, heat resistance, durable, scratch-resistant.'],
+    pros: [
+      'Natural appearance',
+      'Heat resistance',
+      'Durable',
+      'Scratch-resistant',
+    ],
     cons: [
-      'Lighter colours are susceptible to staining, natural colour variations, visible joints.',
+      'Lighter colours are susceptible to staining',
+      'Natural colour variations',
+      'Visible joints',
     ],
     application:
       'Kitchen countertops, vanity countertops, other unit countertops',
@@ -137,9 +144,13 @@ export const PRODUCT_CONTENT_DEFAULTS: ProductContentDefault[] = [
     description:
       'Manufactured stone surface made with mineral aggregates and binders for consistent countertop finishes.',
     pros: [
-      'Premium appearance, non-porous, stain-resistant, low maintenance, uniform finish.',
+      'Premium appearance',
+      'Non-porous',
+      'Stain-resistant',
+      'Low maintenance',
+      'Uniform finish',
     ],
-    cons: ['Higher cost, sensitive to excessive heat'],
+    cons: ['Higher cost', 'Sensitive to excessive heat'],
     application:
       'Kitchen countertops, vanity countertops, other unit countertops',
   },
