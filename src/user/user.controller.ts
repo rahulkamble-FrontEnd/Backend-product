@@ -26,7 +26,7 @@ export class UserController {
    * Admin creates a new user (customer, designer, etc.)
    */
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.USERADMIN)
   @Post()
   async create(
     @Body() createUserDto: CreateUserDto,
@@ -40,7 +40,7 @@ export class UserController {
    * Admin updates a user's details
    */
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.USERADMIN)
   @Put(':id')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
@@ -50,7 +50,7 @@ export class UserController {
    * Admin deactivates a user (soft delete)
    */
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.USERADMIN)
   @Delete(':id')
   async deactivate(@Param('id') id: string) {
     return this.userService.deactivate(id);
@@ -60,7 +60,7 @@ export class UserController {
    * Admin lists all users, optionally filtered by role
    */
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.USERADMIN)
   @Get()
   async listAll(@Query('role') role?: string) {
     return this.userService.findAll(role);
