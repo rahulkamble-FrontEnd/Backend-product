@@ -100,18 +100,28 @@ export class ShortlistApiService {
 
     const customer = await this.userRepository.findOne({
       where: { id: customerId },
-      relations: ['assignedDesigner'],
+      relations: ['assignedDesigner', 'secondaryDesigner'],
     });
 
-    if (customer?.assignedDesigner?.id) {
-      const notification = this.notificationRepository.create({
-        userId: customer.assignedDesigner.id,
-        type: 'sample_requested',
-        message: `${customer.name} requested a sample for shortlist item ${savedShortlist.id}`,
-        link: `/shortlist/${savedShortlist.id}`,
-      });
+    const designerIds = [
+      ...new Set(
+        [
+          customer?.assignedDesigner?.id,
+          customer?.secondaryDesigner?.id,
+        ].filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (customer && designerIds.length > 0) {
+      const notifications = designerIds.map((designerId) =>
+        this.notificationRepository.create({
+          userId: designerId,
+          type: 'sample_requested',
+          message: `${customer.name} requested a sample for shortlist item ${savedShortlist.id}`,
+          link: `/shortlist/${savedShortlist.id}`,
+        }),
+      );
 
-      await this.notificationRepository.save(notification);
+      await this.notificationRepository.save(notifications);
     }
 
     return savedShortlist;

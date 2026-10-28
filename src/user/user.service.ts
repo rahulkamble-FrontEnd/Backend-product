@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   ConflictException,
   NotFoundException,
   ForbiddenException,
@@ -30,12 +31,56 @@ export class UserService {
     private wishlistRepository: Repository<Wishlist>,
   ) {}
 
+  private static readonly DESIGNER_RELATIONS = [
+    'assignedDesigner',
+    'secondaryDesigner',
+  ];
+
   private sanitizeUser(user: User): User {
     const sanitizedUser: Partial<User> = { ...user };
     delete sanitizedUser.passwordHash;
     delete sanitizedUser.resetPasswordToken;
     delete sanitizedUser.resetPasswordExpires;
+    if (user.assignedDesigner) {
+      sanitizedUser.assignedDesigner = this.sanitizeUser(user.assignedDesigner);
+    }
+    if (user.secondaryDesigner) {
+      sanitizedUser.secondaryDesigner = this.sanitizeUser(
+        user.secondaryDesigner,
+      );
+    }
+    if (user.createdBy) {
+      sanitizedUser.createdBy = this.sanitizeUser(user.createdBy);
+    }
     return sanitizedUser as User;
+  }
+
+  private isAssignedDesigner(customer: User, designerId: string): boolean {
+    return (
+      customer.assignedDesigner?.id === designerId ||
+      customer.secondaryDesigner?.id === designerId
+    );
+  }
+
+  private withAuthorInfo<T extends { designerId: string; designer?: User }>(
+    item: T,
+    viewerId: string,
+  ): T & { designerName: string | null; isOwn: boolean } {
+    return {
+      ...item,
+      designerName: item.designer?.name ?? null,
+      isOwn: item.designerId === viewerId,
+    };
+  }
+
+  private async findDesignerOrFail(designerId: string): Promise<User> {
+    const designer = await this.usersRepository.findOne({
+      where: { id: designerId, role: UserRole.DESIGNER },
+    });
+    if (!designer) {
+      throw new NotFoundException(`Designer with ID '${designerId}' not found`);
+    }
+    return designer;
   }
 
   /**
@@ -76,12 +121,12 @@ export class UserService {
    * Update a user's details (called by Admin)
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const { assignedDesignerId, ...rest } = updateUserDto;
+    const { assignedDesignerId, secondaryDesignerId, ...rest } = updateUserDto;
 
     // Find the user to update
     const user = await this.usersRepository.findOne({
       where: { id },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     if (!user) {
@@ -90,21 +135,37 @@ export class UserService {
 
     // 1. Handle designer assignment if ID was provided
     if (assignedDesignerId !== undefined) {
-      if (assignedDesignerId === null) {
-        // Remove assignment
-        user.assignedDesigner = null;
-      } else {
-        // Find and check if target is a designer
-        const designer = await this.usersRepository.findOne({
-          where: { id: assignedDesignerId, role: UserRole.DESIGNER },
-        });
-        if (!designer) {
-          throw new NotFoundException(
-            `Designer with ID '${assignedDesignerId}' not found`,
-          );
-        }
-        user.assignedDesigner = designer;
+      user.assignedDesigner =
+        assignedDesignerId === null
+          ? null
+          : await this.findDesignerOrFail(assignedDesignerId);
+    }
+
+    if (secondaryDesignerId !== undefined) {
+      user.secondaryDesigner =
+        secondaryDesignerId === null
+          ? null
+          : await this.findDesignerOrFail(secondaryDesignerId);
+    }
+
+    if (
+      user.assignedDesigner &&
+      user.secondaryDesigner &&
+      user.assignedDesigner.id === user.secondaryDesigner.id
+    ) {
+      if (secondaryDesignerId) {
+        throw new BadRequestException(
+          'Primary and secondary designer must be different',
+        );
       }
+      // Primary was changed to the current secondary: keep them only as primary.
+      user.secondaryDesigner = null;
+    }
+
+    // Removing the primary promotes the secondary.
+    if (!user.assignedDesigner && user.secondaryDesigner) {
+      user.assignedDesigner = user.secondaryDesigner;
+      user.secondaryDesigner = null;
     }
 
     // 2. Merge the other fields (email, name, role, etc.)
@@ -138,7 +199,7 @@ export class UserService {
     }
     const users = await this.usersRepository.find({
       where,
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
     // Remove sensitive data from all returned users
     return users.map((user) => this.sanitizeUser(user));
@@ -146,11 +207,11 @@ export class UserService {
 
   async findAssignedCustomers(designerId: string): Promise<User[]> {
     const customers = await this.usersRepository.find({
-      where: {
-        role: UserRole.CUSTOMER,
-        assignedDesigner: { id: designerId } as User,
-      },
-      relations: ['assignedDesigner'],
+      where: [
+        { role: UserRole.CUSTOMER, assignedDesigner: { id: designerId } },
+        { role: UserRole.CUSTOMER, secondaryDesigner: { id: designerId } },
+      ],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     return customers.map((user) => this.sanitizeUser(user));
@@ -173,14 +234,14 @@ export class UserService {
   }> {
     const customer = await this.usersRepository.findOne({
       where: { id: customerId, role: UserRole.CUSTOMER },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     if (!customer) {
       throw new NotFoundException(`Customer with ID '${customerId}' not found`);
     }
 
-    if (!skipOwnershipCheck && customer.assignedDesigner?.id !== designerId) {
+    if (!skipOwnershipCheck && !this.isAssignedDesigner(customer, designerId)) {
       throw new ForbiddenException('This customer is not assigned to you');
     }
 
@@ -192,25 +253,32 @@ export class UserService {
       .orderBy('shortlist.createdAt', 'DESC')
       .getMany();
 
-    const notes = await this.designerNotesRepository
-      .createQueryBuilder('designerNote')
-      .leftJoinAndSelect('designerNote.product', 'product')
-      .leftJoinAndSelect('product.images', 'images')
-      .where('designerNote.customerId = :customerId', { customerId })
-      .andWhere('designerNote.designerId = :designerId', { designerId })
-      .orderBy('designerNote.updatedAt', 'DESC')
-      .getMany();
+    // Notes/recommendations are shared between the customer's designers.
+    const notes = (
+      await this.designerNotesRepository
+        .createQueryBuilder('designerNote')
+        .leftJoinAndSelect('designerNote.product', 'product')
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoin('designerNote.designer', 'noteDesigner')
+        .addSelect(['noteDesigner.id', 'noteDesigner.name'])
+        .where('designerNote.customerId = :customerId', { customerId })
+        .orderBy('designerNote.updatedAt', 'DESC')
+        .getMany()
+    ).map((note) => this.withAuthorInfo(note, designerId));
 
-    const recommendations = await this.designerRecommendationsRepository
-      .createQueryBuilder('designerRecommendation')
-      .leftJoinAndSelect('designerRecommendation.product', 'product')
-      .leftJoinAndSelect('product.images', 'images')
-      .where('designerRecommendation.customerId = :customerId', { customerId })
-      .andWhere('designerRecommendation.designerId = :designerId', {
-        designerId,
-      })
-      .orderBy('designerRecommendation.createdAt', 'DESC')
-      .getMany();
+    const recommendations = (
+      await this.designerRecommendationsRepository
+        .createQueryBuilder('designerRecommendation')
+        .leftJoinAndSelect('designerRecommendation.product', 'product')
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoin('designerRecommendation.designer', 'recommendationDesigner')
+        .addSelect(['recommendationDesigner.id', 'recommendationDesigner.name'])
+        .where('designerRecommendation.customerId = :customerId', {
+          customerId,
+        })
+        .orderBy('designerRecommendation.createdAt', 'DESC')
+        .getMany()
+    ).map((recommendation) => this.withAuthorInfo(recommendation, designerId));
 
     const recommendationsByProductId = recommendations.reduce<
       Record<string, DesignerRecommendation[]>
@@ -258,14 +326,14 @@ export class UserService {
   ): Promise<DesignerNote> {
     const customer = await this.usersRepository.findOne({
       where: { id: customerId, role: UserRole.CUSTOMER },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
 
-    if (!isAdmin && customer.assignedDesigner?.id !== designerId) {
+    if (!isAdmin && !this.isAssignedDesigner(customer, designerId)) {
       throw new ForbiddenException('Customer is not assigned to you');
     }
 
@@ -319,14 +387,14 @@ export class UserService {
   ): Promise<DesignerRecommendation> {
     const customer = await this.usersRepository.findOne({
       where: { id: customerId, role: UserRole.CUSTOMER },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
 
-    if (!isAdmin && customer.assignedDesigner?.id !== designerId) {
+    if (!isAdmin && !this.isAssignedDesigner(customer, designerId)) {
       throw new ForbiddenException('Customer is not assigned to you');
     }
 
@@ -373,14 +441,14 @@ export class UserService {
 
     const customer = await this.usersRepository.findOne({
       where: { id: shortlist.customerId, role: UserRole.CUSTOMER },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
 
     if (!customer) {
       throw new NotFoundException('Customer not found');
     }
 
-    if (!isAdmin && customer.assignedDesigner?.id !== designerId) {
+    if (!isAdmin && !this.isAssignedDesigner(customer, designerId)) {
       throw new ForbiddenException('Customer is not assigned to you');
     }
 
@@ -404,7 +472,7 @@ export class UserService {
   findOne(id: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { id },
-      relations: ['assignedDesigner'],
+      relations: UserService.DESIGNER_RELATIONS,
     });
   }
 
