@@ -58,6 +58,7 @@ export class ProductService {
     lighting: 'LT',
     'wall-decorative': 'WD',
     'wall-decoratives': 'WD',
+    'shutter-types': 'ST',
   };
 
   constructor(
@@ -282,7 +283,12 @@ export class ProductService {
 
   /** ZIP image map keys are lowercased so Excel sku case does not block matching. */
   private normalizeBulkImageSkuKey(sku: string): string {
-    return sku.trim().toLowerCase();
+    // Excel often auto-converts ' to ’, while file names keep the plain quote.
+    return sku
+      .normalize('NFC')
+      .replace(/[\u2018\u2019\u201B\u0060\u00B4]/g, "'")
+      .trim()
+      .toLowerCase();
   }
 
   private async uploadBulkImagesFromZipWithManager(
