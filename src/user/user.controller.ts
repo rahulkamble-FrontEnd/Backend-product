@@ -9,6 +9,7 @@ import {
   Param,
   Delete,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto, UserRole } from './dto/create-user.dto';
@@ -64,5 +65,15 @@ export class UserController {
   @Get()
   async listAll(@Query('role') role?: string) {
     return this.userService.findAll(role);
+  }
+
+  /**
+   * Admin / user admin views a customer's wishlist (read-only)
+   */
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.USERADMIN)
+  @Get(':id/wishlist')
+  async getCustomerWishlist(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userService.getCustomerWishlist(id);
   }
 }

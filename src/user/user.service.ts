@@ -314,6 +314,28 @@ export class UserService {
     };
   }
 
+  async getCustomerWishlist(
+    customerId: string,
+  ): Promise<{ customer: User; wishlist: Wishlist[] }> {
+    const customer = await this.usersRepository.findOne({
+      where: { id: customerId, role: UserRole.CUSTOMER },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Customer with ID '${customerId}' not found`);
+    }
+
+    const wishlist = await this.wishlistRepository
+      .createQueryBuilder('wishlist')
+      .leftJoinAndSelect('wishlist.product', 'wishlistProduct')
+      .leftJoinAndSelect('wishlistProduct.images', 'wishlistImages')
+      .where('wishlist.customerId = :customerId', { customerId })
+      .orderBy('wishlist.createdAt', 'DESC')
+      .getMany();
+
+    return { customer: this.sanitizeUser(customer), wishlist };
+  }
+
   /**
    * Add a note for a customer by a designer
    */
