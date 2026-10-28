@@ -59,6 +59,11 @@ export class User {
   @JoinColumn({ name: 'assigned_designer_id' })
   assignedDesigner: User | null;
 
+  // Optional second designer; assignedDesigner remains the primary one.
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'secondary_designer_id' })
+  secondaryDesigner: User | null;
+
   // Automatically tracks when the user was created
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

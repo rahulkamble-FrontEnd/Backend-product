@@ -21,4 +21,9 @@ export class UpdateUserDto {
   @IsUUID()
   @IsOptional()
   assignedDesignerId?: string;
+
+  // null removes the secondary designer
+  @IsUUID()
+  @IsOptional()
+  secondaryDesignerId?: string | null;
 }
