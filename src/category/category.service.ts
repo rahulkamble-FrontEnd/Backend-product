@@ -62,6 +62,7 @@ export class CategoryService {
   async findBySlug(slug: string): Promise<Category | null> {
     const category = await this.categoryRepository.findOne({
       where: { slug, isActive: true },
+      relations: ['parent'],
     });
     if (!category) {
       return null;
