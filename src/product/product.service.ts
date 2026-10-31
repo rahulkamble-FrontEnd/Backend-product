@@ -59,6 +59,9 @@ export class ProductService {
     'wall-decorative': 'WD',
     'wall-decoratives': 'WD',
     'shutter-types': 'ST',
+    cnc: 'CN',
+    'cnc-2': 'CN',
+    'cnc-types': 'CN',
   };
 
   constructor(
