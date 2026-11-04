@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { AuthenticatedRequest } from './types/auth-user.type';
+import { getUserManagerScope } from '../user/user-manager-access';
 
 @Controller('auth')
 export class AuthController {
@@ -89,7 +90,12 @@ export class AuthController {
   @Get('me')
   getMe(@Request() req: AuthenticatedRequest) {
     const { id, name, role } = req.user;
-    return { id, name, role };
+    return {
+      id,
+      name,
+      role,
+      userManagerScope: getUserManagerScope(req.user),
+    };
   }
 
   /**
